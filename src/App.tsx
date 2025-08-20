@@ -5,6 +5,7 @@ import Member from "./screens/Member";
 import MemberRoom from "./screens/MemberRoom";
 import HostRoom from "./screens/HostRoom";
 import MainLayout from "./components/MainLayout";
+import { ToastContainer } from "react-toastify";
 
 function App() {
   return (
@@ -18,6 +19,7 @@ function App() {
           <Route path="/hostRoom/:roomId" element={<MainLayout><HostRoom /></MainLayout>} />
         </Routes>
       </Router>
+      <ToastContainer />
     </>
   );
 }

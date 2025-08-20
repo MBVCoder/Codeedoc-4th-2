@@ -3,6 +3,7 @@ import { Link, useNavigate } from "react-router-dom";
 import { Plus } from "lucide-react";
 import { useEffect , useState, useContext } from "react";
 import { SocketContext } from "../context/SocketContextProvider";
+import { toast } from "react-toastify";
 
 const Member = () => {
 	const [roomId, setRoomId] = useState("");
@@ -15,10 +16,14 @@ const Member = () => {
   }, []);
 
 	const handleSubmit = (e: any) => {
+		if (roomId.trim() === "") {
+      toast.error("Room ID cannot be empty");
+      return;
+    }
     e.preventDefault();
 		socket.emit("join-room",roomId);
-    setRoomId("");
     navigate(`/memberRoom/${roomId}`);
+    setRoomId("");
   };
   return (
     <div>
