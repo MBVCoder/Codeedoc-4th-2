@@ -1,71 +1,77 @@
 import { useEffect, useContext, useState } from "react";
 import { SocketContext } from "../context/SocketContextProvider";
-// import { useParams } from 'react-router-dom'
 import { useNavigate } from "react-router-dom";
+import { toast } from "react-toastify";
+import Heading from "../components/Heading";
+import YouTube from 'react-youtube';
 
-const HostRoom = () => {
+const HostRoom = ({ roomId }: any) => {
+  console.log("Room ID in HostRoom :", roomId);
   const navigate = useNavigate();
   const { socket } = useContext(SocketContext);
   console.log("Socket in HostRoom :", socket);
   const [tracks, setTracks] = useState([]);
-  // const { roomId } = useParams();
-
-  // useEffect(() => {
-  // 	if(!socket) {
-  // 		console.log("User Reload the page :", socket);
-  // 		navigate('/');
-  // 	};
-  // 	socket.on("room-tracks", (data: any) => {
-  // 	console.log("Room Tracks in HostRoom :", data);
-  // 	setTracks(data);
-  // })
-  // }, [])
+  const [selectedTrack, setSelectedTrack] = useState<any>(null);
 
   useEffect(() => {
-    // Wait for socket to be connected
-    const checkSocketConnection = () => {
-      if (!socket.connected) {
-        console.log("Socket not connected, redirecting to home...");
-        navigate("/"); // Navigate if socket is not connected
-      } else {
-        console.log("Socket connected:", socket.id);
-
-        // Now that the socket is connected, set up listeners
-        socket.on("room-tracks", (data: any) => {
-          console.log("Room Tracks in HostRoom :", data);
-          setTracks(data);
-        });
-      }
-    };
-
-    // Check if socket exists
     if (!socket) {
-      console.log("Socket not available on first reload.");
+      console.log("Socket not available");
       navigate("/");
       return;
-    } else {
-      checkSocketConnection();
     }
+    socket.off("room-tracks").on("room-tracks", (data: any) => {
+      console.log("Room Tracks in HostRoom :", data);
+      setTracks(data);
+    });
+    socket.off("clear-state").on("clear-state", () => {
+      navigate("/");
+      toast.error("Host has left the room");
+    });
+  }, [socket, navigate]);
 
-    // Cleanup event listeners when the component unmounts
-    return () => {
-      if (socket) {
-        socket.off("room-tracks");
-      }
-    };
-  }, [socket, navigate]); // Re-run when socket changes
+  const handleTrackSelect = (track: any) => {
+    setSelectedTrack(track);
+  };
 
   return (
-    <div className="flex flex-col items-center justify-center h-screen text-white relative">
-      {tracks.length > 0 ? (
+    <div className="flex flex-col items-center justify-center h-screen text-white relative ">
+      <div className="flex items-center justify-center gap-5">
+        <Heading text="Welcome to the room :" />
+        <h1 className="text-center text-4xl font-semibold">{roomId}</h1>
+      </div>
+      <div className="flex items-center justify-center w-full h-full gap-5 ">
+        <div className="flex flex-col items-center justify-center gap-2  my-5 p-5 bg-black/20 rounded-xl border-1 border-white/20">
+          <div>
+            {selectedTrack && selectedTrack.url && selectedTrack.url.includes("youtube.com") && (
+            <div className="my-4 min-w-[390px] min-h-[220px]">
+              <YouTube 
+                videoId={selectedTrack.url.split("v=")[1]}  
+                opts={{
+                  height: '220',
+                  width: '390',
+                  playerVars: {
+                    autoplay: 1,  
+                  },
+                }}
+              />
+            </div>
+          )}
+          </div>
+          <div>
+            {selectedTrack?.url}
+          </div>
+        </div>
+        <div className="flex flex-col items-center justify-center gap-2  my-5 p-5 bg-black/20 rounded-xl border-1 border-white/20">
+        {tracks.length > 0 ? (
         <div className="flex flex-col items-center justify-center w-full h-full gap-5 ">
-          <h1 className="text-center text-2xl">Tracks in Room</h1>
-          <div className="flex flex-col items-center justify-center gap-2  my-5 p-5 bg-black/20 rounded-xl border-1 border-white/20">
+          <h1 className="text-center text-3xl">Tracks in Room</h1>
+          <div className="flex flex-col items-center justify-center gap-2 p-5">
             {tracks?.map((track: any, index: number) => {
               return (
                 <div
+                onClick={() => handleTrackSelect(track)}
                   key={index}
-                  className="flex flex-col items-center justify-center gap-2 p-2"
+                  className="flex flex-col items-center justify-center gap-2 p-2 bg-black/20 rounded-xl border-1 border-white/20"
                 >
                   <h1 className="text-3xl font-semibold tracking-wide my-1">
                     {track.title}
@@ -78,7 +84,8 @@ const HostRoom = () => {
         </div>
       ) : (
         <h1 className="text-center text-2xl">No Tracks in Room</h1>
-      )}
+      )}</div>
+      </div>
     </div>
   );
 };

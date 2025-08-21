@@ -1,59 +1,53 @@
 import { useEffect, useContext, useState } from "react";
 import { SocketContext } from "../context/SocketContextProvider";
-// import { useParams } from 'react-router-dom'
 import { useNavigate } from "react-router-dom";
+import { toast } from "react-toastify";
 
-const MemberRoom = () => {
+const MemberRoom = ({ tracks, roomId }: any) => {
   const navigate = useNavigate();
   const { socket } = useContext(SocketContext);
-  console.log("Socket in HostRoom :", socket);
-  const [tracks, setTracks] = useState([]);
-  // const { roomId } = useParams();
-
-  // useEffect(() => {
-  // 	if(!socket) {
-  // 		console.log("User Reload the page :", socket);
-  // 		navigate('/');
-  // 	};
-  // 	socket.on("room-tracks", (data: any) => {
-  // 	console.log("Room Tracks in HostRoom :", data);
-  // 	setTracks(data);
-  // })
-  // }, [])
+  console.log("Socket in MemberRoom :", socket);
 
   useEffect(() => {
-    // Wait for socket to be connected
-    const checkSocketConnection = () => {
-      if (!socket.connected) {
-        console.log("Socket not connected, redirecting to home...");
-        navigate("/"); // Navigate if socket is not connected
-      } else {
-        console.log("Socket connected:", socket.id);
-
-        // Now that the socket is connected, set up listeners
-        socket.on("room-tracks", (data: any) => {
-          console.log("Room Tracks in MemberRoom :", data);
-          setTracks(data);
-        });
-      }
-    };
-
-    // Check if socket exists
     if (!socket) {
-      console.log("Socket not available on first reload.");
+      console.log("User Reload the page :", socket);
       navigate("/");
       return;
-    } else {
-      checkSocketConnection();
     }
+    socket.off("clear-state").on("clear-state", () => {
+      navigate("/");
+      toast.error("Host has left the room");
+    });
+  }, [socket, navigate]);
 
-    // Cleanup event listeners when the component unmounts
-    return () => {
-      if (socket) {
-        socket.off("room-tracks");
-      }
-    };
-  }, [socket, navigate]); // Re-run when socket changes
+  // useEffect(() => {
+  //   // Wait for socket to be connected
+  //   const checkSocketConnection = () => {
+  //     if (!socket.connected) {
+  //       console.log("Socket not connected, redirecting to home...");
+  //       navigate("/"); // Navigate if socket is not connected
+  //     } else {
+  //       console.log("Socket connected:", socket.id);
+
+  //       // Now that the socket is connected, set up listeners
+  //       socket.off("room-tracks").on("room-tracks", (data: any) => {
+  //         console.log("Room Tracks in MemberRoom :", data);
+  //         setTracks(data);
+  //       });
+  //     }
+  //   };
+
+  //   // Check if socket exists
+  //   if (!socket) {
+  //     console.log("Socket not available on first reload.");
+  //     navigate("/");
+  //     return;
+  //   } else {
+  //     checkSocketConnection();
+  //   }
+
+  //   // Cleanup event listeners when the component unmounts
+  // }, [socket, navigate]);
 
   return (
     <div className="flex flex-col items-center justify-center h-screen text-white relative">

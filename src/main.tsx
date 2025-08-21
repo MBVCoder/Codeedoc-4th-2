@@ -2,12 +2,15 @@
 import { createRoot } from "react-dom/client";
 import "./styles/index.css";
 import App from "./App.tsx";
-import  SocketContextProvider  from "./context/SocketContextProvider.tsx";
+import SocketContextProvider from "./context/SocketContextProvider.tsx";
+import { BrowserRouter } from "react-router-dom";
 
 createRoot(document.getElementById("root")!).render(
   <>
-    <SocketContextProvider>
-      <App />
-    </SocketContextProvider>
+    <BrowserRouter>
+      <SocketContextProvider>
+        <App />
+      </SocketContextProvider>
+    </BrowserRouter>
   </>,
 );
