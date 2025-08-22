@@ -72,7 +72,6 @@ const HostRoom = ({ roomId }: any) => {
   }
 };
 
-
   const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     if (videoUrl.length === 0) {
@@ -110,10 +109,8 @@ const HostRoom = ({ roomId }: any) => {
     socket.emit("update-tracks", { tracks: tracks.filter((t: any) => t.id !== id) });
   };
 
-
-
   return (
-    <div className="flex flex-col items-center justify-center min-h-screen text-white relative p-5 pt-10 ">
+    <div className="flex flex-col items-center justify-center min-h-screen text-white relative p-5 pt-10 z-50">
       <div className="py-3 flex items-center justify-center gap-5">
         <Heading text="Welcome to the Room :" />
         <h1 className="text-center text-4xl font-semibold text-white">
@@ -146,12 +143,12 @@ const HostRoom = ({ roomId }: any) => {
               <hr className="border-white/20 w-full mt-5" />
               <div className="flex items-center justify-between h-20 w-full">
                 <div className="w-1/10 h-0.5 p-5"></div>
-                <div className="flex items-center justify-center gap-10 p-5">
+                <div className="flex items-center justify-center gap-10 p-5 videoControls">
                   <SkipBack />
                   <Play />
                   <SkipForward />
                 </div>
-                <div className=" p-5">
+                <div className=" p-5 videoShare">
                   <Share2 />
                 </div>
               </div>
@@ -212,13 +209,13 @@ const HostRoom = ({ roomId }: any) => {
                   Clear All
                 </button>
               </div>
-              <div className="flex flex-col items-center justify-center gap-2 p-5 w-full">
+              <div className="flex flex-col items-center justify-center gap-2 p-5 w-full TrackLists">
                 {tracks?.map((track: any, index: number) => {
                   const isPlaying = currentPlayingId === track.id;
                   return (
                     <div
                       key={track.id}
-                      className="flex items-center justify-between gap-2 p-2 bg-black/20 rounded-xl border-1 border-white/20 w-full h-20 px-10"
+                      className={`flex items-center justify-between gap-2 p-2  rounded-xl border-1 ${isPlaying ? "border-white bg-white/20" : "border-white/20 bg-black/20"} w-full h-20 px-10`}
                     >
                       <div className="flex flex-col ">
                         <h1 className="text-xl font-semibold tracking-wide my-1 text-left line-clamp-1 overflow-hidden break-all">
