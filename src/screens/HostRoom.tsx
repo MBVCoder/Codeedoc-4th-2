@@ -5,7 +5,16 @@ import { toast } from "react-toastify";
 import Heading from "../components/Heading";
 import YouTube from "react-youtube";
 import { extractYouTubeId } from "../components/ExtractYoutubeId";
-import { Play, Trash, Plus, SkipBack, SkipForward, Share2 } from "lucide-react";
+import yt from "../assets/yt.svg";
+import {
+  Play,
+  Trash,
+  Plus,
+  SkipBack,
+  SkipForward,
+  Share2,
+  Pause,
+} from "lucide-react";
 
 const HostRoom = ({ roomId }: any) => {
   // console.log("Room ID in HostRoom :", roomId);
@@ -16,6 +25,8 @@ const HostRoom = ({ roomId }: any) => {
   const [selectedTrack, setSelectedTrack] = useState<any>(null);
   const [videoUrl, setVideoUrl] = useState<any>("");
   const [trackName, setTrackName] = useState<any>("");
+  const [currentPlayingId, setCurrentPlayingId] = useState<string | null>(null);
+  const [player, setPlayer] = useState<any>(null);
 
   useEffect(() => {
     if (!socket) {
@@ -33,13 +44,38 @@ const HostRoom = ({ roomId }: any) => {
     });
   }, [socket, navigate]);
 
-  const handleTrackSelect = (track: any) => {
+  const handlePlayPause = ({ id, index }: { id: string; index: number }) => {
+  if (currentPlayingId === id) {
+    // 👉 Pause
+    setCurrentPlayingId(null);
+    setSelectedTrack(null);
+    if (player) player.pauseVideo();
+
+    // emit pause
+    socket.emit("update-playing-status", { value: false });
+  } else {
+    // 👉 Play
+    setCurrentPlayingId(id);
+    const track = tracks.find((t: any) => t.id === id);
     setSelectedTrack(track);
-  };
+
+    // emit current track index
+    socket.emit("update-current-playing", { index });
+
+    // emit playing status
+    socket.emit("update-playing-status", { value: true });
+
+    if (player) {
+      player.loadVideoById(track.videoId);
+      player.playVideo();
+    }
+  }
+};
+
 
   const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    if(videoUrl.length === 0){
+    if (videoUrl.length === 0) {
       toast.error("Please enter a YouTube URL");
       return;
     }
@@ -66,7 +102,15 @@ const HostRoom = ({ roomId }: any) => {
     setTrackName("");
   };
 
-  const handleDeleteAll = () => {};
+  const handleDeleteAll = () => {
+    socket.emit("update-tracks", { tracks: [] });
+  };
+
+  const handleDeleteTrack = (id: string) => {
+    socket.emit("update-tracks", { tracks: tracks.filter((t: any) => t.id !== id) });
+  };
+
+
 
   return (
     <div className="flex flex-col items-center justify-center min-h-screen text-white relative p-5 pt-10 ">
@@ -80,24 +124,25 @@ const HostRoom = ({ roomId }: any) => {
         <div className="flex-1 md:max-w-[500px] space-y-4">
           <div className=" bg-black/20 rounded-xl border-1 border-white/20 VideoContainer p-5">
             <div className="flex flex-col items-center justify-center">
-              <div>
-                {selectedTrack &&
-                  selectedTrack.url &&
-                  selectedTrack.url.includes("youtube.com") && (
-                    <div className="flex flex-col items-center justify-center gap-5">
-                      <YouTube
-                        videoId={extractYouTubeId(selectedTrack?.url)}
-                        opts={{
-                          height: "150",
-                          width: "280",
-                          playerVars: {
-                            autoplay: 1,
-                          },
-                        }}
-                      />
-                    </div>
-                  )}
+              <div className="flex flex-col items-center justify-center gap-5">
+                {selectedTrack ? (
+                  <YouTube
+                    videoId={extractYouTubeId(selectedTrack?.url)}
+                    opts={{
+                      height: "150",
+                      width: "280",
+                      playerVars: { autoplay: 1 },
+                    }}
+                    onReady={(event) => setPlayer(event.target)} // store player instance
+                  />
+                ) : (
+                  // Default black screen placeholder
+                  <div className="w-[280px] h-[150px] bg-black rounded-md flex items-center justify-center text-white/40">
+                   <img src={yt} alt="yt logo" className="w-20 h-20" />
+                  </div>
+                )}
               </div>
+
               <hr className="border-white/20 w-full mt-5" />
               <div className="flex items-center justify-between h-20 w-full">
                 <div className="w-1/10 h-0.5 p-5"></div>
@@ -169,23 +214,31 @@ const HostRoom = ({ roomId }: any) => {
               </div>
               <div className="flex flex-col items-center justify-center gap-2 p-5 w-full">
                 {tracks?.map((track: any, index: number) => {
+                  const isPlaying = currentPlayingId === track.id;
                   return (
                     <div
-                      key={index}
+                      key={track.id}
                       className="flex items-center justify-between gap-2 p-2 bg-black/20 rounded-xl border-1 border-white/20 w-full h-20 px-10"
                     >
                       <div className="flex flex-col ">
-                        <h1 className="text-xl font-semibold tracking-wide my-1 text-left line-clamp-1 overflow-hidden">
+                        <h1 className="text-xl font-semibold tracking-wide my-1 text-left line-clamp-1 overflow-hidden break-all">
                           {track.title}
                         </h1>
-                        <p className="text-sm text-white/30 ">Track:{index}</p>
+                        <p className="text-sm text-white/30 ">Track: {index}</p>
                       </div>
                       <div className="flex items-center justify-center gap-10">
-                        <div className="hover:bg-white/30 p-2 rounded-full group hover:cursor-pointer">
-                          <Play onClick={() => handleTrackSelect(track)} className="w-5 h-5 group-hover:fill-green-400 group-hover:scale-115 group-hover:cursor-pointer" />
+                        <div
+                          className="hover:bg-white/30 p-2 rounded-full group hover:cursor-pointer"
+                          onClick={() => handlePlayPause({ id: track.id, index })}
+                        >
+                          {isPlaying ? (
+                            <Pause className="w-5 h-5 group-hover:fill-red-400 group-hover:scale-115" />
+                          ) : (
+                            <Play className="w-5 h-5 group-hover:fill-green-400 group-hover:scale-115" />
+                          )} 
                         </div>
                         <div className="hover:bg-white/30 p-2 rounded-full group hover:cursor-pointer">
-                          <Trash className="w-5 h-5 group-hover:fill-red-400 group-hover:scale-115 group-hover:cursor-pointer" />
+                          <Trash onClick={()=>handleDeleteTrack(track.id)} className="w-5 h-5 group-hover:fill-red-400 group-hover:scale-115 group-hover:cursor-pointer" />
                         </div>
                       </div>
                     </div>
