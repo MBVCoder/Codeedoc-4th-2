@@ -35,10 +35,17 @@ const MemberRoom = ({
   const [player, setPlayer] = useState<any>(null);
   const [currentPlayingId, setCurrentPlayingId] = useState<string | null>(null);
   const [localTracks, setLocalTracks] = useState(tracks);
+  const [volume, setVolume] = useState<Number>(100);
 
   useEffect(() => {
     setLocalTracks(tracks); // Whenever parent updates tracks, sync local
   }, [tracks]);
+
+  useEffect(() => {
+    socket.off("update-volume").on("update-volume", (data: any) => {
+      setVolume(data);
+    });
+  }, [volume]);
 
   useEffect(() => {
     if (!socket) {
@@ -246,6 +253,27 @@ const MemberRoom = ({
                       playerVars: { autoplay: 1 },
                     }}
                     onReady={(event) => setPlayer(event.target)} // store player instance
+                    onStateChange={(event) => {
+                      const playerStatus = event.data; // -1 = unstarted, 0 = ended, 1 = playing, 2 = paused
+
+                      if (playerStatus === 1) {
+                        // Playing
+                        if (
+                          selectedTrack &&
+                          currentPlayingId !== selectedTrack.id
+                        ) {
+                          setCurrentPlayingId(selectedTrack.id);
+                          socket.emit("update-playing-status", { value: true });
+                        }
+                      } else if (playerStatus === 2) {
+                        // Paused
+                        setCurrentPlayingId(null);
+                        socket.emit("update-playing-status", { value: false });
+                      } else if (playerStatus === 0) {
+                        // Ended -> Auto skip to next track (optional)
+                        // handleSkip("next");
+                      }
+                    }}
                   />
                 ) : (
                   // Default black screen placeholder
@@ -317,11 +345,14 @@ const MemberRoom = ({
                 {allowMemberControlVolume && (
                   <input
                     type="range"
+                    value={volume}
                     min="0"
                     max="100"
                     defaultValue="100"
                     onChange={(e) => {
+                      socket.emit("update-volume", volume);
                       if (player) player.setVolume(Number(e.target.value));
+                      setVolume(Number(e.target.value));
                     }}
                     className="w-full h-full"
                   />
@@ -425,7 +456,7 @@ const MemberRoom = ({
                             {track.title}
                           </h1>
                           <p className="text-sm text-white/30 line-clamp-1 overflow-hidden break-all">
-                            Track: {index}
+                            Track: {index + 1}
                           </p>
                         </div>
                         <div className="flex items-center justify-center gap-10">

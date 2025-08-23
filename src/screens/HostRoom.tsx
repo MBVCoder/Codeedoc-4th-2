@@ -14,6 +14,7 @@ import {
   SkipForward,
   Share2,
   Pause,
+  Volume,
 } from "lucide-react";
 import { Reorder } from "framer-motion";
 
@@ -28,6 +29,7 @@ const HostRoom = ({ roomId }: any) => {
   const [trackName, setTrackName] = useState<any>("");
   const [currentPlayingId, setCurrentPlayingId] = useState<string | null>(null);
   const [player, setPlayer] = useState<any>(null);
+  const [volume, setVolume] = useState<Number>(100);
 
   useEffect(() => {
     if (!socket) {
@@ -92,6 +94,12 @@ const HostRoom = ({ roomId }: any) => {
       });
     });
   }, [socket, player, tracks, navigate]);
+
+  useEffect(() => {
+    socket.off("update-volume").on("update-volume", (data: any) => {
+      setVolume(data);
+    });
+  }, [volume]);
 
   const handlePlayPause = ({ id, index }: { id: string; index: number }) => {
     if (currentPlayingId === id) {
@@ -198,6 +206,27 @@ const HostRoom = ({ roomId }: any) => {
                       playerVars: { autoplay: 1 },
                     }}
                     onReady={(event) => setPlayer(event.target)} // store player instance
+                    onStateChange={(event) => {
+                      const playerStatus = event.data; // -1 = unstarted, 0 = ended, 1 = playing, 2 = paused
+
+                      if (playerStatus === 1) {
+                        // Playing
+                        if (
+                          selectedTrack &&
+                          currentPlayingId !== selectedTrack.id
+                        ) {
+                          setCurrentPlayingId(selectedTrack.id);
+                          socket.emit("update-playing-status", { value: true });
+                        }
+                      } else if (playerStatus === 2) {
+                        // Paused
+                        setCurrentPlayingId(null);
+                        socket.emit("update-playing-status", { value: false });
+                      } else if (playerStatus === 0) {
+                        // Ended -> Auto skip to next track (optional)
+                        // handleSkip("next");
+                      }
+                    }}
                   />
                 ) : (
                   // Default black screen placeholder
@@ -210,51 +239,52 @@ const HostRoom = ({ roomId }: any) => {
               <hr className="border-white/20 w-full mt-5" />
               <div className="flex items-center justify-between h-20 w-full">
                 <div className="w-1/10 h-0.5 p-5 hidden sm:block"></div>
-                <div className="flex items-center justify-center gap-5 sm:gap-10 p-5">
-                  <div className="flex items-center justify-center gap-10 p-5 videoControls">
-                    <div
-                      className="hover:bg-white/30 p-2 rounded-full group hover:cursor-pointer"
-                      onClick={() => handleSkip("prev")}
-                    >
-                      <SkipBack className="max-w-6 max-h-6 group-hover:fill-blue-400" />
-                    </div>
 
-                    <div
-                      className="hover:bg-white/30 p-2 rounded-full group hover:cursor-pointer"
-                      onClick={() => {
-                        if (selectedTrack) {
-                          // If a track is already selected, toggle play/pause
-                          handlePlayPause({
-                            id: selectedTrack.id,
-                            index: tracks.findIndex(
-                              (t) => t.id === selectedTrack.id
-                            ),
-                          });
-                        } else if (tracks.length > 0) {
-                          // If no track is selected yet, start the first track
-                          handlePlayPause({ id: tracks[0].id, index: 0 });
-                        }
-                      }}
-                    >
-                      {currentPlayingId ? (
-                        <Pause className="max-w-6 max-h-6 group-hover:fill-red-400" />
-                      ) : (
-                        <Play className="max-w-6 max-h-6 group-hover:fill-green-400" />
-                      )}
-                    </div>
+                <div className="flex items-center justify-center gap-5 sm:gap-10 p-5 videoControls">
+                  <div
+                    className="hover:bg-white/30 p-2 rounded-full group hover:cursor-pointer"
+                    onClick={() => handleSkip("prev")}
+                  >
+                    <SkipBack className="max-w-6 max-h-6 group-hover:fill-blue-400" />
+                  </div>
 
-                    <div
-                      className="hover:bg-white/30 p-2 rounded-full group hover:cursor-pointer"
-                      onClick={() => handleSkip("next")}
-                    >
-                      <SkipForward className="max-w-6 max-h-6 group-hover:fill-blue-400" />
-                    </div>
+                  <div
+                    className="hover:bg-white/30 p-2 rounded-full group hover:cursor-pointer"
+                    onClick={() => {
+                      if (selectedTrack) {
+                        // If a track is already selected, toggle play/pause
+                        handlePlayPause({
+                          id: selectedTrack.id,
+                          index: tracks.findIndex(
+                            (t) => t.id === selectedTrack.id
+                          ),
+                        });
+                      } else if (tracks.length > 0) {
+                        // If no track is selected yet, start the first track
+                        handlePlayPause({ id: tracks[0].id, index: 0 });
+                      }
+                    }}
+                  >
+                    {currentPlayingId ? (
+                      <Pause className="max-w-6 max-h-6 group-hover:fill-red-400" />
+                    ) : (
+                      <Play className="max-w-6 max-h-6 group-hover:fill-green-400" />
+                    )}
+                  </div>
+
+                  <div
+                    className="hover:bg-white/30 p-2 rounded-full group hover:cursor-pointer"
+                    onClick={() => handleSkip("next")}
+                  >
+                    <SkipForward className="max-w-6 max-h-6 group-hover:fill-blue-400" />
                   </div>
                 </div>
+
                 <div
                   className="p-5 videoShare hover:bg-white/30 rounded-full hover:cursor-pointer max-[400px]:hidden"
                   onClick={() => {
-                    if (!selectedTrack) toast.error("Please Play the track first !!");
+                    if (!selectedTrack)
+                      toast.error("Please Play the track first !!");
                     else {
                       navigator.clipboard.writeText(selectedTrack?.url);
                       toast.success("Video link copied!");
@@ -269,9 +299,12 @@ const HostRoom = ({ roomId }: any) => {
                   type="range"
                   min="0"
                   max="100"
+                  value={volume}
                   defaultValue="100"
                   onChange={(e) => {
+                    socket.emit("update-volume", volume);
                     if (player) player.setVolume(Number(e.target.value));
+                    setVolume(Number(e.target.value));
                   }}
                   className="w-full h-full"
                 />
@@ -365,7 +398,7 @@ const HostRoom = ({ roomId }: any) => {
                             {track.title}
                           </h1>
                           <p className="text-sm text-white/30 line-clamp-1 overflow-hidden break-all">
-                            Track: {index}
+                            Track: {index + 1}
                           </p>
                         </div>
                         <div className="flex items-center justify-center gap-10">
