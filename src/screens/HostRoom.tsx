@@ -65,10 +65,14 @@ const HostRoom = ({ roomId }: any) => {
       .on("update-playing-status", (data: { value: boolean }) => {
         if (!player) return;
         if (data.value) player.playVideo();
-        else player.pauseVideo();
+        else {
+          player.pauseVideo();
+          setCurrentPlayingId(null); // ✅ Reset UI state when paused
+          setSelectedTrack(null);
+        }
 
-        // reflect in UI icon
-        if (!data.value) setCurrentPlayingId(null);
+        // // reflect in UI icon
+        // if (!data.value) setCurrentPlayingId(null);
       });
   }, [socket,player,tracks, navigate]);
 
