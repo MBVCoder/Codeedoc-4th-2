@@ -74,7 +74,24 @@ const HostRoom = ({ roomId }: any) => {
         // // reflect in UI icon
         // if (!data.value) setCurrentPlayingId(null);
       });
-  }, [socket,player,tracks, navigate]);
+
+    socket.off("sync-request").on("sync-request", () => {
+      if (!player) return;
+
+      const videoData = player.getVideoData();
+      const videoId = videoData?.video_id || "";
+      const currentTime = player.getCurrentTime ? player.getCurrentTime() : 0;
+      const playerState = player.getPlayerState ? player.getPlayerState() : -1;
+
+      socket.emit("sync-response", {
+        type: "TIME",
+        playerState,
+        time: Date.now(),
+        currentTime,
+        videoId,
+      });
+    });
+  }, [socket, player, tracks, navigate]);
 
   const handlePlayPause = ({ id, index }: { id: string; index: number }) => {
     if (currentPlayingId === id) {
@@ -160,16 +177,16 @@ const HostRoom = ({ roomId }: any) => {
   };
 
   return (
-    <div className="flex flex-col items-center justify-center min-h-screen text-white relative p-5 pt-10">
+    <div className="flex flex-col items-center justify-center min-h-screen text-white relative p-5 max-lg:pt-15">
       <div className="py-3 flex items-center justify-center gap-5">
         <Heading text="Welcome to the Room :" />
-        <h1 className="text-center text-4xl font-semibold text-white">
+        <h1 className="text-center text-2xl sm:text-4xl font-semibold text-white">
           {roomId}
         </h1>
       </div>
-      <div className="flex max-md:flex-col gap-4 w-full flex-1 Video&TracksContainer">
-        <div className="flex-1 md:max-w-[500px] space-y-4">
-          <div className=" bg-black/20 rounded-xl border-1 border-white/20 VideoContainer p-5">
+      <div className="flex max-lg:flex-col gap-4 w-full flex-1 Video&TracksContainer">
+        <div className="flex-1 lg:max-w-[500px] space-y-4 videoContainer">
+          <div className=" bg-black/20 rounded-xl border-1 border-white/20 VideoContainer p-5 ">
             <div className="flex flex-col items-center justify-center">
               <div className="flex flex-col items-center justify-center gap-5">
                 {selectedTrack ? (
@@ -184,7 +201,7 @@ const HostRoom = ({ roomId }: any) => {
                   />
                 ) : (
                   // Default black screen placeholder
-                  <div className="w-[280px] h-[150px] bg-black rounded-md flex items-center justify-center text-white/40">
+                  <div className="w-[280px] h-[150px] bg-black  rounded-md flex items-center justify-center text-white/40">
                     <img src={yt} alt="yt logo" className="w-20 h-20" />
                   </div>
                 )}
@@ -192,14 +209,14 @@ const HostRoom = ({ roomId }: any) => {
 
               <hr className="border-white/20 w-full mt-5" />
               <div className="flex items-center justify-between h-20 w-full">
-                <div className="w-1/10 h-0.5 p-5"></div>
-                <div className="flex items-center justify-center gap-10 p-5 videoControls">
+                <div className="w-1/10 h-0.5 p-5 hidden sm:block"></div>
+                <div className="flex items-center justify-center gap-5 sm:gap-10 p-5">
                   <div className="flex items-center justify-center gap-10 p-5 videoControls">
                     <div
                       className="hover:bg-white/30 p-2 rounded-full group hover:cursor-pointer"
                       onClick={() => handleSkip("prev")}
                     >
-                      <SkipBack className="w-6 h-6 group-hover:fill-blue-400" />
+                      <SkipBack className="max-w-6 max-h-6 group-hover:fill-blue-400" />
                     </div>
 
                     <div
@@ -220,9 +237,9 @@ const HostRoom = ({ roomId }: any) => {
                       }}
                     >
                       {currentPlayingId ? (
-                        <Pause className="w-6 h-6 group-hover:fill-red-400" />
+                        <Pause className="max-w-6 max-h-6 group-hover:fill-red-400" />
                       ) : (
-                        <Play className="w-6 h-6 group-hover:fill-green-400" />
+                        <Play className="max-w-6 max-h-6 group-hover:fill-green-400" />
                       )}
                     </div>
 
@@ -230,18 +247,21 @@ const HostRoom = ({ roomId }: any) => {
                       className="hover:bg-white/30 p-2 rounded-full group hover:cursor-pointer"
                       onClick={() => handleSkip("next")}
                     >
-                      <SkipForward className="w-6 h-6 group-hover:fill-blue-400" />
+                      <SkipForward className="max-w-6 max-h-6 group-hover:fill-blue-400" />
                     </div>
                   </div>
                 </div>
                 <div
-                  className="p-5 videoShare hover:bg-white/30 rounded-full hover:cursor-pointer"
+                  className="p-5 videoShare hover:bg-white/30 rounded-full hover:cursor-pointer max-[400px]:hidden"
                   onClick={() => {
-                    navigator.clipboard.writeText(selectedTrack?.url);
-                    toast.success("Video link copied!");
+                    if (!selectedTrack) toast.error("Please Play the track first !!");
+                    else {
+                      navigator.clipboard.writeText(selectedTrack?.url);
+                      toast.success("Video link copied!");
+                    }
                   }}
                 >
-                  <Share2 />
+                  <Share2 className="max-w-6 max-h-6" />
                 </div>
               </div>
               <div className="flex items-center justify-center w-full gap-5 VideoVolume">
@@ -289,18 +309,18 @@ const HostRoom = ({ roomId }: any) => {
                     className="bg-black/40 hover:bg-black text-white rounded-xl px-6 py-3 w-full h-full hover:cursor-pointer duration-300 flex items-center justify-center gap-2"
                   >
                     Add
-                    <Plus className="w-5 h-5" />
+                    <Plus className="max-w-5 max-h-5" />
                   </button>
                 </div>
               </form>
             </div>
           </div>
         </div>
-        <div className="flex-1 gap-2 p-5 bg-black/20 rounded-xl border-1 border-white/20 TracksListContainer">
+        <div className="flex-1 gap-2 p-2 max-sm:pt-10 sm:p-5 bg-black/20 rounded-xl border-1 border-white/20 TracksListContainer">
           {tracks.length > 0 ? (
             <div className="flex flex-col items-center justify-center gap-5">
               <div className="flex items-center justify-between w-full px-5">
-                <h1 className="self-start text-3xl flex items-center">
+                <h1 className="self-start text-xl sm:text-3xl flex items-center max-sm:my-auto">
                   Tracks : ({tracks.length})
                 </h1>
                 <button
@@ -310,65 +330,69 @@ const HostRoom = ({ roomId }: any) => {
                   Clear All
                 </button>
               </div>
-              <Reorder.Group
-                axis="y"
-                values={tracks}
-                onReorder={(newOrder) => {
-                  setTracks(newOrder);
-                  socket.emit("update-tracks", { tracks: newOrder });
-                }}
-                className="flex flex-col items-center justify-center gap-2 p-5 w-full TrackLists"
-              >
-                {tracks.map((track: any, index: number) => {
-                  const isPlaying = currentPlayingId === track.id;
+              <div className="flex-1 w-full overflow-y-auto max-h-[550px] sm:px-5">
+                <Reorder.Group
+                  axis="y"
+                  values={tracks}
+                  onReorder={(newOrder) => {
+                    setTracks(newOrder);
+                    socket.emit("update-tracks", { tracks: newOrder });
+                  }}
+                  className="flex flex-col items-center justify-center gap-2 p-5 w-full TrackLists"
+                >
+                  {tracks.map((track: any, index: number) => {
+                    const isPlaying = currentPlayingId === track.id;
 
-                  return (
-                    <Reorder.Item
-                      key={track.id}
-                      value={track}
-                      whileDrag={{ scale: 1.05 }}
-                      whileHover={{ scale: 1.02 }}
-                      transition={{
-                        type: "spring",
-                        stiffness: 300,
-                        damping: 25,
-                      }}
-                      className={`flex items-center justify-between gap-2 p-2 rounded-xl border-1 ${
-                        isPlaying
-                          ? "border-white bg-white/20"
-                          : "border-white/20 bg-black/20"
-                      } w-full h-20 px-10`}
-                    >
-                      <div className="flex flex-col">
-                        <h1 className="text-xl font-semibold tracking-wide my-1 text-left line-clamp-1 overflow-hidden break-all">
-                          {track.title}
-                        </h1>
-                        <p className="text-sm text-white/30">Track: {index}</p>
-                      </div>
-                      <div className="flex items-center justify-center gap-10">
-                        <div
-                          className="hover:bg-white/30 p-2 rounded-full group hover:cursor-pointer"
-                          onClick={() =>
-                            handlePlayPause({ id: track.id, index })
-                          }
-                        >
-                          {isPlaying ? (
-                            <Pause className="w-5 h-5 group-hover:fill-red-400 group-hover:scale-115" />
-                          ) : (
-                            <Play className="w-5 h-5 group-hover:fill-green-400 group-hover:scale-115" />
-                          )}
+                    return (
+                      <Reorder.Item
+                        key={track.id}
+                        value={track}
+                        whileDrag={{ scale: 1.05 }}
+                        whileHover={{ scale: 1.02 }}
+                        transition={{
+                          type: "spring",
+                          stiffness: 300,
+                          damping: 25,
+                        }}
+                        className={`flex items-center justify-between gap-2 p-2 rounded-xl border-1 ${
+                          isPlaying
+                            ? "border-white bg-white/20"
+                            : "border-white/20 bg-black/20"
+                        } w-full h-20 px-10`}
+                      >
+                        <div className="flex flex-col ">
+                          <h1 className="text-xl font-semibold tracking-wide my-1 text-left line-clamp-1 overflow-hidden break-all">
+                            {track.title}
+                          </h1>
+                          <p className="text-sm text-white/30 line-clamp-1 overflow-hidden break-all">
+                            Track: {index}
+                          </p>
                         </div>
-                        <div className="hover:bg-white/30 p-2 rounded-full group hover:cursor-pointer">
-                          <Trash
-                            onClick={() => handleDeleteTrack(track.id)}
-                            className="w-5 h-5 group-hover:fill-red-400 group-hover:scale-115 group-hover:cursor-pointer"
-                          />
+                        <div className="flex items-center justify-center gap-10">
+                          <div
+                            className="hover:bg-white/30 p-2 rounded-full group hover:cursor-pointer"
+                            onClick={() =>
+                              handlePlayPause({ id: track.id, index })
+                            }
+                          >
+                            {isPlaying ? (
+                              <Pause className="w-5 h-5 group-hover:fill-red-400 group-hover:scale-115" />
+                            ) : (
+                              <Play className="w-5 h-5 group-hover:fill-green-400 group-hover:scale-115" />
+                            )}
+                          </div>
+                          <div className="hover:bg-white/30 p-2 rounded-full group hover:cursor-pointer">
+                            <Trash
+                              onClick={() => handleDeleteTrack(track.id)}
+                              className="w-5 h-5 group-hover:fill-red-400 group-hover:scale-115 group-hover:cursor-pointer"
+                            />
+                          </div>
                         </div>
-                      </div>
-                    </Reorder.Item>
-                  );
-                })}
-              </Reorder.Group>
+                      </Reorder.Item>
+                    );
+                  })}
+                </Reorder.Group>
+              </div>
             </div>
           ) : (
             <h1 className="text-center text-2xl">No Tracks in Room</h1>

@@ -10,6 +10,10 @@ const Member = () => {
   const [roomId, setRoomId] = useState("");
   const [roomJoined, setRoomJoined] = useState(false);
   const [tracks, setTracks] = useState([]);
+  const [allowMemberControlVolume, setAllowMemberControlVolume] =
+    useState(false);
+  const [allowMemberToPlay, setAllowMemberToPlay] = useState(false);
+  const [allowMemberToSync, setAllowMemberToSync] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
   const { socket } = useContext(SocketContext);
   const navigate = useNavigate();
@@ -35,6 +39,9 @@ const Member = () => {
         } else {
           toast.success("Joined the room");
           setRoomJoined((prev: boolean) => !prev);
+          setAllowMemberControlVolume(data.allowMemberControlVolume);
+          setAllowMemberToPlay(data.allowMemberToPlay);
+          setAllowMemberToSync(data.allowMemberToSync);
         }
       });
       socket.off("room-tracks").on("room-tracks", (data: any) => {
@@ -45,7 +52,7 @@ const Member = () => {
   }, [socket, navigate, handleSubmit]);
 
   if (roomJoined) {
-    return <MemberRoom tracks={tracks} roomId={roomId} />;
+    return <MemberRoom tracks={tracks} roomId={roomId} allowMemberControlVolume={allowMemberControlVolume} allowMemberToPlay={allowMemberToPlay} allowMemberToSync={allowMemberToSync} />;
   }
 
   return (

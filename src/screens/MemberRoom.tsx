@@ -10,21 +10,35 @@ import {
   SkipBack,
   SkipForward,
   Share2,
+  RefreshCcw,
 } from "lucide-react";
 import Heading from "../components/Heading";
 import YouTube from "react-youtube";
 import { extractYouTubeId } from "../components/ExtractYoutubeId";
 import yt from "../assets/yt.svg";
+import { Reorder } from "framer-motion";
 
-const MemberRoom = ({ tracks, roomId }: any) => {
+const MemberRoom = ({
+  tracks,
+  roomId,
+  allowMemberControlVolume,
+  allowMemberToPlay,
+  allowMemberToSync,
+}: any) => {
   // console.log("Socket in MemberRoom :", socket);
   const navigate = useNavigate();
   const { socket } = useContext(SocketContext);
   const [selectedTrack, setSelectedTrack] = useState<any>(null);
+  // const [syncActive, setSyncActive] = useState(false);
   const [videoUrl, setVideoUrl] = useState<any>("");
   const [trackName, setTrackName] = useState<any>("");
   const [player, setPlayer] = useState<any>(null);
   const [currentPlayingId, setCurrentPlayingId] = useState<string | null>(null);
+  const [localTracks, setLocalTracks] = useState(tracks);
+
+  useEffect(() => {
+    setLocalTracks(tracks); // Whenever parent updates tracks, sync local
+  }, [tracks]);
 
   useEffect(() => {
     if (!socket) {
@@ -70,12 +84,19 @@ const MemberRoom = ({ tracks, roomId }: any) => {
   }, [socket, navigate, player, tracks]);
 
   const handlePlayPause = ({ id, index }: { id: string; index: number }) => {
+    if (!allowMemberToPlay) {
+      toast.info("Members are not allowed to play");
+      return;
+    }
+
     if (currentPlayingId === id) {
       // Pause
       setCurrentPlayingId(null);
       if (player) player.pauseVideo();
 
-      socket.emit("update-playing-status", { value: false });
+      if (allowMemberToSync) {
+        socket.emit("update-playing-status", { value: false });
+      }
     } else {
       // Play
       const track = tracks.find((t: any) => t.id === id);
@@ -162,19 +183,60 @@ const MemberRoom = ({ tracks, roomId }: any) => {
     handlePlayPause({ id: newTrack.id, index: newIndex }); // reuses existing play/pause logic (syncs everything)
   };
 
+  const handleSync = () => {
+    socket.emit("sync-request");
+
+    socket.off("sync-response").on("sync-response", (data: any) => {
+      console.log("Sync Response in MemberRoom:", data);
+
+      if (data.type === "ERROR") {
+        toast.error("Sync Failed");
+        return;
+      }
+
+      if (!player) {
+        toast.error("Player not ready yet");
+        return;
+      }
+
+      if (data.type === "TIME") {
+        const { videoId, currentTime, playerState } = data;
+
+        if (videoId) {
+          // Load the video and seek to correct time
+          player.loadVideoById(videoId, currentTime);
+
+          // Sync playback state
+          if (playerState === 1) {
+            // Playing
+            player.playVideo();
+          } else if (playerState === 2 || playerState === 5) {
+            // Paused or cued
+            player.pauseVideo();
+          }
+        } else {
+          toast.info("No video currently playing");
+          player.stopVideo();
+        }
+
+        toast.success("Synced with host");
+      }
+    });
+  };
+
   return (
-    <div className="flex flex-col items-center justify-center min-h-screen text-white relative p-5 pt-10 ">
+    <div className="flex flex-col items-center justify-center min-h-screen text-white relative p-5 max-lg:pt-15">
       <div className="py-3 flex items-center justify-center gap-5">
         <Heading text="Welcome to the Room :" />
-        <h1 className="text-center text-4xl font-semibold text-white">
+        <h1 className="text-center text-2xl  sm:text-4xl font-semibold text-white">
           {roomId}
         </h1>
       </div>
-      <div className="flex max-md:flex-col gap-4 w-full flex-1 Video&TracksContainer">
-        <div className="flex-1 md:max-w-[500px] space-y-4">
+      <div className="flex max-lg:flex-col gap-4 w-full flex-1 Video&TracksContainer">
+        <div className="flex-1 lg:max-w-[500px] space-y-4 VideoContainer">
           <div className=" bg-black/20 rounded-xl border-1 border-white/20 VideoContainer p-5">
             <div className="flex flex-col items-center justify-center">
-              <div>
+              <div className="flex flex-col items-center justify-center gap-5">
                 {selectedTrack ? (
                   <YouTube
                     videoId={extractYouTubeId(selectedTrack?.url)}
@@ -194,20 +256,23 @@ const MemberRoom = ({ tracks, roomId }: any) => {
               </div>
               <hr className="border-white/20 w-full mt-5" />
               <div className="flex items-center justify-between h-20 w-full">
-                <div className="w-1/10 h-0.5 p-5"></div>
-                <div className="flex items-center justify-center gap-10 p-5">
+                <div className="w-1/10 h-0.5 p-5 hidden sm:block"></div>
+                <div
+                  className={`flex items-center justify-center gap-5 sm:gap-10 p-5 videoControls ${
+                    !allowMemberToPlay ? "opacity-50 pointer-events-none" : ""
+                  }`}
+                >
                   <div
                     className="hover:bg-white/30 p-2 rounded-full group hover:cursor-pointer"
                     onClick={() => handleSkip("prev")}
                   >
-                    <SkipBack className="w-6 h-6 group-hover:fill-blue-400" />
+                    <SkipBack className="max-w-6 max-h-6 group-hover:fill-blue-400" />
                   </div>
 
                   <div
                     className="hover:bg-white/30 p-2 rounded-full group hover:cursor-pointer"
                     onClick={() => {
                       if (selectedTrack) {
-                        // If a track is already selected, toggle play/pause
                         handlePlayPause({
                           id: selectedTrack.id,
                           index: tracks.findIndex(
@@ -215,15 +280,14 @@ const MemberRoom = ({ tracks, roomId }: any) => {
                           ),
                         });
                       } else if (tracks.length > 0) {
-                        // If no track is selected yet, start the first track
                         handlePlayPause({ id: tracks[0].id, index: 0 });
                       }
                     }}
                   >
                     {currentPlayingId ? (
-                      <Pause className="w-6 h-6 group-hover:fill-red-400" />
+                      <Pause className="max-w-6 max-h-6 group-hover:fill-red-400" />
                     ) : (
-                      <Play className="w-6 h-6 group-hover:fill-green-400" />
+                      <Play className="max-w-6 max-h-6 group-hover:fill-green-400" />
                     )}
                   </div>
 
@@ -231,25 +295,50 @@ const MemberRoom = ({ tracks, roomId }: any) => {
                     className="hover:bg-white/30 p-2 rounded-full group hover:cursor-pointer"
                     onClick={() => handleSkip("next")}
                   >
-                    <SkipForward className="w-6 h-6 group-hover:fill-blue-400" />
+                    <SkipForward className="max-w-6 max-h-6 group-hover:fill-blue-400" />
                   </div>
                 </div>
+
                 <div
-                  className="p-5 videoShare hover:bg-white/30 rounded-full hover:cursor-pointer"
+                  className="p-5 videoShare hover:bg-white/30 rounded-full hover:cursor-pointer max-[400px]:hidden"
                   onClick={() => {
-                    navigator.clipboard.writeText(selectedTrack?.url);
-                    toast.success("Video link copied!");
+                    if (!selectedTrack)
+                      toast.error("Please Play the track first !!");
+                    else {
+                      navigator.clipboard.writeText(selectedTrack?.url);
+                      toast.success("Video link copied!");
+                    }
                   }}
                 >
-                  <Share2 />
+                  <Share2 className="max-w-6 max-h-6" />
                 </div>
               </div>
-              <div className="flex items-center justify-center w-full gap-5">
-                <input type="range" className="w-full h-full" />
+              <div className="flex items-center justify-center w-full gap-5 VideoVolume">
+                {allowMemberControlVolume && (
+                  <input
+                    type="range"
+                    min="0"
+                    max="100"
+                    defaultValue="100"
+                    onChange={(e) => {
+                      if (player) player.setVolume(Number(e.target.value));
+                    }}
+                    className="w-full h-full"
+                  />
+                )}
               </div>
             </div>
           </div>
-          <div className="flex flex-col items-center justify-center gap-2  my-5 p-5 bg-black/20 rounded-xl border-1 border-white/20 AddtrackContainer">
+          {allowMemberToSync && (
+            <button
+              onClick={handleSync}
+              className="flex gap-3 py-3 px-5 bg-black/30 rounded-xl hover:bg-black hover:scale-105 duration-500 hover:cursor-pointer mx-auto"
+            >
+              Sync with host <RefreshCcw />
+            </button>
+          )}
+
+          <div className="flex flex-col items-center justify-center gap-2 p-5 bg-black/20 rounded-xl border-1 border-white/20 AddtrackContainer">
             <div className="border-b-1 border-white/80 p-3">
               <h1 className="text-2xl font-semibold tracking-wide text-center">
                 Add New Track
@@ -280,18 +369,18 @@ const MemberRoom = ({ tracks, roomId }: any) => {
                     className="bg-black/40 hover:bg-black text-white rounded-xl px-6 py-3 w-full h-full hover:cursor-pointer duration-300 flex items-center justify-center gap-2"
                   >
                     Add
-                    <Plus className="w-5 h-5" />
+                    <Plus className="max-w-5 max-h-5" />
                   </button>
                 </div>
               </form>
             </div>
           </div>
         </div>
-        <div className="flex-1 gap-2 p-5 bg-black/20 rounded-xl border-1 border-white/20 TracksListContainer">
+        <div className="flex-1 gap-2 p-2 sm:p-5 max-sm:pt-10 bg-black/20 rounded-xl border-1 border-white/20 TracksListContainer">
           {tracks.length > 0 ? (
-            <div className="flex flex-col items-center justify-center gap-5">
+            <div className="flex flex-col gap-5 items-center justify-center">
               <div className="flex items-center justify-between w-full px-5">
-                <h1 className="self-start text-3xl flex items-center">
+                <h1 className="self-start text-xl sm:text-3xl flex items-center">
                   Tracks : ({tracks.length})
                 </h1>
                 <button
@@ -301,44 +390,74 @@ const MemberRoom = ({ tracks, roomId }: any) => {
                   Clear All
                 </button>
               </div>
-              <div className="flex flex-col items-center justify-center gap-2 p-5 w-full">
-                {tracks?.map((track: any, index: number) => {
-                  const isPlaying = currentPlayingId === track.id;
-                  return (
-                    <div
-                      key={index}
-                      className="flex items-center justify-between gap-2 p-2 bg-black/20 rounded-xl border-1 border-white/20 w-full h-20 px-10"
-                    >
-                      <div className="flex flex-col ">
-                        <h1 className="text-xl font-semibold tracking-wide my-1 text-left line-clamp-1 overflow-hidden">
-                          {track.title}
-                        </h1>
-                        <p className="text-sm text-white/30 ">Track:{index}</p>
-                      </div>
-                      <div className="flex items-center justify-center gap-10">
-                        <div
-                          className="hover:bg-white/30 p-2 rounded-full group hover:cursor-pointer"
-                          onClick={() =>
-                            handlePlayPause({ id: track.id, index })
-                          }
-                        >
-                          {isPlaying ? (
-                            <Pause className="w-5 h-5 group-hover:fill-red-400 group-hover:scale-115" />
-                          ) : (
-                            <Play className="w-5 h-5 group-hover:fill-green-400 group-hover:scale-115" />
-                          )}
-                        </div>
+              <div className="flex-1 w-full overflow-y-auto max-h-[540px] sm:px-5">
+                <Reorder.Group
+                  axis="y"
+                  values={tracks}
+                  onReorder={(newOrder) => {
+                    setLocalTracks(newOrder);
+                    socket.emit("update-tracks", { tracks: newOrder });
+                  }}
+                  className="flex flex-col items-center justify-center gap-2 p-5 w-full TrackLists"
+                >
+                  {tracks.map((track: any, index: number) => {
+                    const isPlaying = currentPlayingId === track.id;
 
-                        <div className="hover:bg-white/30 p-2 rounded-full group hover:cursor-pointer">
-                          <Trash
-                            onClick={() => handleDeleteTrack(track.id)}
-                            className="w-5 h-5 group-hover:fill-red-400 group-hover:scale-115 group-hover:cursor-pointer"
-                          />
+                    return (
+                      <Reorder.Item
+                        key={track.id}
+                        value={track}
+                        whileDrag={{ scale: 1.05 }}
+                        whileHover={{ scale: 1.02 }}
+                        transition={{
+                          type: "spring",
+                          stiffness: 300,
+                          damping: 25,
+                        }}
+                        className={`flex items-center justify-between gap-2 p-2 rounded-xl border-1 ${
+                          isPlaying
+                            ? "border-white bg-white/20"
+                            : "border-white/20 bg-black/20"
+                        } w-full h-20 px-10`}
+                      >
+                        <div className="flex flex-col">
+                          <h1 className="text-xl font-semibold tracking-wide my-1 text-left line-clamp-1 overflow-hidden break-all">
+                            {track.title}
+                          </h1>
+                          <p className="text-sm text-white/30 line-clamp-1 overflow-hidden break-all">
+                            Track: {index}
+                          </p>
                         </div>
-                      </div>
-                    </div>
-                  );
-                })}
+                        <div className="flex items-center justify-center gap-10">
+                          <div
+                            className={`hover:bg-white/30 p-2 rounded-full group ${
+                              !allowMemberToPlay
+                                ? "opacity-50 cursor-not-allowed"
+                                : "hover:cursor-pointer"
+                            }`}
+                            onClick={() =>
+                              allowMemberToPlay &&
+                              handlePlayPause({ id: track.id, index })
+                            }
+                          >
+                            {isPlaying ? (
+                              <Pause className="w-5 h-5 group-hover:fill-red-400 group-hover:scale-115" />
+                            ) : (
+                              <Play className="w-5 h-5 group-hover:fill-green-400 group-hover:scale-115" />
+                            )}
+                          </div>
+
+                          <div className="hover:bg-white/30 p-2 rounded-full group hover:cursor-pointer">
+                            <Trash
+                              onClick={() => handleDeleteTrack(track.id)}
+                              className="w-5 h-5 group-hover:fill-red-400 group-hover:scale-115 group-hover:cursor-pointer"
+                            />
+                          </div>
+                        </div>
+                      </Reorder.Item>
+                    );
+                  })}
+                </Reorder.Group>
               </div>
             </div>
           ) : (
