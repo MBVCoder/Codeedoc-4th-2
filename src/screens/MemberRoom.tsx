@@ -14,6 +14,7 @@ import {
 import Heading from "../components/Heading";
 import YouTube from "react-youtube";
 import { extractYouTubeId } from "../components/ExtractYoutubeId";
+import yt from "../assets/yt.svg";
 
 const MemberRoom = ({ tracks, roomId }: any) => {
   // console.log("Socket in MemberRoom :", socket);
@@ -174,23 +175,22 @@ const MemberRoom = ({ tracks, roomId }: any) => {
           <div className=" bg-black/20 rounded-xl border-1 border-white/20 VideoContainer p-5">
             <div className="flex flex-col items-center justify-center">
               <div>
-                {selectedTrack &&
-                  selectedTrack.url &&
-                  selectedTrack.url.includes("youtube.com") && (
-                    <div className="flex flex-col items-center justify-center gap-5">
-                      <YouTube
-                        videoId={extractYouTubeId(selectedTrack?.url)}
-                        opts={{
-                          height: "150",
-                          width: "280",
-                          playerVars: {
-                            autoplay: 1,
-                          },
-                        }}
-                        onReady={(event) => setPlayer(event.target)}
-                      />
-                    </div>
-                  )}
+                {selectedTrack ? (
+                  <YouTube
+                    videoId={extractYouTubeId(selectedTrack?.url)}
+                    opts={{
+                      height: "150",
+                      width: "280",
+                      playerVars: { autoplay: 1 },
+                    }}
+                    onReady={(event) => setPlayer(event.target)} // store player instance
+                  />
+                ) : (
+                  // Default black screen placeholder
+                  <div className="w-[280px] h-[150px] bg-black rounded-md flex items-center justify-center text-white/40">
+                    <img src={yt} alt="yt logo" className="w-20 h-20" />
+                  </div>
+                )}
               </div>
               <hr className="border-white/20 w-full mt-5" />
               <div className="flex items-center justify-between h-20 w-full">
