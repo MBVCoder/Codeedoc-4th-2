@@ -1,6 +1,6 @@
 import Heading from "../components/Heading";
 import { BadgePlus } from "lucide-react";
-import { useEffect, useState , useContext , useRef } from "react";
+import { useEffect, useState, useContext, useRef } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { SocketContext } from "../context/SocketContextProvider";
 import HostRoom from "./HostRoom";
@@ -13,6 +13,9 @@ const Host = () => {
   const inputRef = useRef<HTMLInputElement>(null);
   const [roomId, setRoomId] = useState("");
   const [roomCreated, setRoomCreated] = useState(false);
+  const [allowMemberToPlay, setallowMemberToPlay] = useState(true);
+  const [allowMemberToSync, setallowMemberToSync] = useState(true);
+  const [allowMemberControlVolume, setallowMemberControlVolume] = useState(true);
 
   useEffect(() => {
     inputRef.current?.focus();
@@ -28,12 +31,12 @@ const Host = () => {
       toast.error("Room ID cannot be empty");
       return;
     }
-    socket.emit("create-room", { roomId });
+    socket.emit("create-room", { roomId , allowMemberToPlay , allowMemberToSync , allowMemberControlVolume });
     setRoomCreated((prev: boolean) => !prev);
   };
 
   if (roomCreated) {
-    return <HostRoom roomId={roomId} />;
+    return <HostRoom roomId={roomId}  />;
   }
   return (
     <div className="flex flex-col items-center justify-center h-screen text-white relative">
@@ -47,10 +50,11 @@ const Host = () => {
         </div>
         <form
           onSubmit={handleSubmit}
-          className="flex max-sm:flex-col w-fit items-center justify-center gap-2 p-5 bg-black/20 rounded-xl border-1 border-white/20 mx-5 sm:mx-0"
+          className="flex flex-col w-fit items-center justify-center gap-2 p-5 bg-black/20 rounded-xl border-1 border-white/20 mx-5 sm:mx-0"
         >
+          <div className="flex items-center justify-center gap-2 p-5 ">
           <input
-          ref={inputRef}
+            ref={inputRef}
             type="text"
             value={roomId}
             onChange={(e) => setRoomId(e.target.value)}
@@ -63,6 +67,33 @@ const Host = () => {
           >
             Create <BadgePlus className="w-5 h-5 fill-green-600" />
           </button>
+          </div>
+          <div className="flex flex-col justify-center gap-2 ">
+            <div className="flex gap-3 items-center">
+              <input
+                type="checkbox"
+                checked={allowMemberToPlay}
+                onChange={() => setallowMemberToPlay((prev) => !prev)}
+              />
+              <p className="text-sm text-center">Allow to play</p>
+            </div>
+            <div className="flex gap-3 items-cente">
+              <input
+                type="checkbox"
+                checked={allowMemberToSync}
+                onChange={() => setallowMemberToSync((prev) => !prev)}
+              />
+              <p className="text-sm text-center">Allow to sync</p>
+            </div>
+            <div className="flex gap-3 items-center">
+              <input
+                type="checkbox"
+                checked={allowMemberControlVolume}
+                onChange={() => setallowMemberControlVolume((prev) => !prev)}
+              />
+              <p className="text-sm text-center">Allow to control volume</p>
+            </div>
+          </div>
         </form>
         <p className="text-center">
           Want to Join any room ?{" "}

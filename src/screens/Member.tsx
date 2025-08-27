@@ -1,7 +1,7 @@
 import Heading from "../components/Heading";
-import { Link , useNavigate } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { Plus } from "lucide-react";
-import { useEffect, useState, useContext , useRef } from "react";
+import { useEffect, useState, useContext, useRef } from "react";
 import { SocketContext } from "../context/SocketContextProvider";
 import { toast } from "react-toastify";
 import MemberRoom from "./MemberRoom";
@@ -13,6 +13,10 @@ const Member = () => {
   const inputRef = useRef<HTMLInputElement>(null);
   const { socket } = useContext(SocketContext);
   const navigate = useNavigate();
+  const [allowMemberToPlay, setallowMemberToPlay] = useState(false);
+  const [allowMemberToSync, setallowMemberToSync] = useState(false);
+  const [allowMemberControlVolume, setallowMemberControlVolume] =
+    useState(false);
 
   const handleSubmit = (e: any) => {
     e.preventDefault();
@@ -35,6 +39,9 @@ const Member = () => {
         } else {
           toast.success("Joined the room");
           setRoomJoined((prev: boolean) => !prev);
+          setallowMemberToPlay(data.allowMemberToPlay);
+          setallowMemberToSync(data.allowMemberToSync);
+          setallowMemberControlVolume(data.allowMemberControlVolume);
         }
       });
       socket.off("room-tracks").on("room-tracks", (data: any) => {
@@ -45,7 +52,7 @@ const Member = () => {
   }, [socket, navigate, handleSubmit]);
 
   if (roomJoined) {
-    return <MemberRoom tracks={tracks} roomId={roomId} />;
+    return <MemberRoom tracks={tracks} roomId={roomId} allowMemberToPlay={allowMemberToPlay} allowMemberToSync={allowMemberToSync} allowMemberControlVolume={allowMemberControlVolume} />;
   }
 
   return (
@@ -54,7 +61,9 @@ const Member = () => {
         <div className="flex flex-col items-center justify-center w-full h-full gap-5 ">
           <Heading text="Member" />
           <div className="mt-5">
-            <p className="max-md:text-sm text-center capitalize px-2 sm:px-0">Enter room name to join</p>
+            <p className="max-md:text-sm text-center capitalize px-2 sm:px-0">
+              Enter room name to join
+            </p>
             <hr className="w-1/2 mx-auto mt-2" />
           </div>
           <form

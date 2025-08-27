@@ -111,6 +111,26 @@ const HostRoom = ({ roomId }: any) => {
         }
       });
 
+    // Add new event listener for sync-request
+    socket.off("sync-request").on("sync-request", async () => {
+      if (!playerRef.current) return;
+
+      // Get the current player state and video details
+      const currentTime = await playerRef.current.getCurrentTime();
+      const playerState = await playerRef.current.getPlayerState();
+      const videoId = selectedTrack?.videoId || "";
+
+      // Emit the sync-response with the current state data
+      socket.emit("sync-response", {
+        currentTime: currentTime,
+        playerState: playerState,
+        videoId: videoId,
+        time: Date.now(),
+        type: "TIME",
+      });
+      console.log("Sync response sent to member.");
+    });
+
     socket.off("clear-state").on("clear-state", () => {
       if (socket && socket.connected) {
         socket.disconnect();

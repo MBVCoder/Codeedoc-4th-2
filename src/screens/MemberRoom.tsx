@@ -15,6 +15,7 @@ import {
 import Heading from "../components/Heading";
 import YouTubePlayer from "youtube-player";
 import { extractYouTubeId } from "../components/ExtractYoutubeId";
+import yt from "../assets/yt.svg";
 import { Reorder } from "framer-motion";
 
 const MemberRoom = ({
@@ -24,6 +25,7 @@ const MemberRoom = ({
   allowMemberToPlay,
   allowMemberToSync,
 }: any) => {
+  // console.log("Socket in MemberRoom :", socket);
   const navigate = useNavigate();
   const isRemoteAction = useRef(false);
   const { socket } = useContext(SocketContext);
@@ -43,7 +45,7 @@ const MemberRoom = ({
     playerRef.current = YouTubePlayer(containerRef.current, {
       height: "150",
       width: "280",
-      playerVars: { autoplay: 1, playsinline: 1 },
+      playerVars: { autoplay: 1, playsinline: 1 , mute: 1 },
     });
 
     playerRef.current.on("ready", (event) => {
@@ -53,11 +55,9 @@ const MemberRoom = ({
 
     playerRef.current.on("stateChange", (event: any) => {
       if (event.data === 1) {
-        console.log("state change", event);
         console.log("Playing");
         setIsPlaying(true);
       } else if (event.data === 2) {
-        console.log("state change", event);
         console.log("Paused");
         setIsPlaying(false); // PAUSED
       } else if (event.data === 0) {
@@ -101,6 +101,7 @@ const MemberRoom = ({
 
         if (playerRef.current) {
           playerRef.current.loadVideoById(next.videoId);
+          // playerRef.current.playVideo();
         }
       });
 
@@ -115,6 +116,10 @@ const MemberRoom = ({
           return;
         }
         if (data.value) {
+          playerRef.current.playVideo()?.catch((err: any) => {
+            console.warn("Autoplay blocked:", err);
+          });
+          playerRef.current.playVideo();
           setIsPlaying(true);
         } else {
           playerRef.current.pauseVideo();
@@ -135,20 +140,20 @@ const MemberRoom = ({
     // If the same track is already selected
     if (currentPlayingId === id) {
       if (isPlaying) {
-        // Pause
+        // 👉 Pause
         playerRef.current?.pauseVideo();
         isRemoteAction.current = true;
         socket.emit("update-playing-status", { value: false });
         setIsPlaying(false);
       } else {
-        // Resume
+        // 👉 Resume
         playerRef.current?.playVideo();
         isRemoteAction.current = true;
         socket.emit("update-playing-status", { value: true });
         setIsPlaying(true);
       }
     } else {
-      // Play a new track
+      // 👉 Play a new track
       setCurrentPlayingId(id);
       const track = tracks.find((t: any) => t.id === id);
       setSelectedTrack(track);
@@ -323,6 +328,7 @@ const MemberRoom = ({
           </div>
           {allowMemberToSync && (
             <button
+              // onClick={handleSync}
               onClick={() => {
                 socket.emit("sync-request");
               }}
