@@ -1,4 +1,4 @@
-import { useEffect, useContext, useState } from "react";
+import { useEffect, useContext, useState, useRef } from "react";
 import { SocketContext } from "../context/SocketContextProvider";
 import { useNavigate } from "react-router-dom";
 import { toast } from "react-toastify";
@@ -10,41 +10,97 @@ import {
   SkipBack,
   SkipForward,
   Share2,
+  RefreshCcw,
 } from "lucide-react";
 import Heading from "../components/Heading";
-import YouTube from "react-youtube";
+import YouTubePlayer from "youtube-player";
 import { extractYouTubeId } from "../components/ExtractYoutubeId";
-import yt from "../assets/yt.svg";
+import { Reorder } from "framer-motion";
 
-const MemberRoom = ({ tracks, roomId }: any) => {
-  // console.log("Socket in MemberRoom :", socket);
+const MemberRoom = ({
+  tracks,
+  roomId,
+  allowMemberControlVolume,
+  allowMemberToPlay,
+  allowMemberToSync,
+}: any) => {
   const navigate = useNavigate();
+  const isRemoteAction = useRef(false);
   const { socket } = useContext(SocketContext);
   const [selectedTrack, setSelectedTrack] = useState<any>(null);
   const [videoUrl, setVideoUrl] = useState<any>("");
   const [trackName, setTrackName] = useState<any>("");
-  const [player, setPlayer] = useState<any>(null);
   const [currentPlayingId, setCurrentPlayingId] = useState<string | null>(null);
+  const [localTracks, setLocalTracks] = useState(tracks);
+  const [volume, setVolume] = useState<Number>(100);
+  const [isPlaying, setIsPlaying] = useState(false);
+  const playerRef = useRef<any>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!containerRef.current) return;
+
+    playerRef.current = YouTubePlayer(containerRef.current, {
+      height: "150",
+      width: "280",
+      playerVars: { autoplay: 1, playsinline: 1 },
+    });
+
+    playerRef.current.on("ready", (event) => {
+      console.log("YouTube player ready");
+      console.log(event);
+    });
+
+    playerRef.current.on("stateChange", (event: any) => {
+      if (event.data === 1) {
+        console.log("state change", event);
+        console.log("Playing");
+        setIsPlaying(true);
+      } else if (event.data === 2) {
+        console.log("state change", event);
+        console.log("Paused");
+        setIsPlaying(false); // PAUSED
+      } else if (event.data === 0) {
+        setIsPlaying(false); // ENDED
+      }
+    });
+
+    return () => {
+      playerRef.current?.destroy();
+    };
+  }, []);
+
+  useEffect(() => {
+    setLocalTracks(tracks); // Whenever parent updates tracks, sync local
+  }, [tracks]);
+
+  useEffect(() => {
+    socket.off("update-volume").on("update-volume", (data: any) => {
+      setVolume(data);
+    });
+  }, [volume]);
 
   useEffect(() => {
     if (!socket) {
+      console.log("Socket not available");
       navigate("/");
       return;
     }
-
     // Handle track change
     socket
       .off("update-current-playing")
       .on("update-current-playing", (data: { index: number }) => {
-        const track = tracks[data.index];
-        if (!track) return;
+        console.log("index listen from memberroom ", data);
+        const next = (tracks as any[])[data.index];
+        if (!next) return;
 
-        setSelectedTrack(track);
-        setCurrentPlayingId(track.id);
+        setSelectedTrack(next);
+        setCurrentPlayingId(next.id);
 
-        if (player) {
-          player.loadVideoById(track.videoId);
-          player.playVideo();
+        console.log("playerRef.current", playerRef.current);
+
+        if (playerRef.current) {
+          playerRef.current.loadVideoById(next.videoId);
         }
       });
 
@@ -52,60 +108,67 @@ const MemberRoom = ({ tracks, roomId }: any) => {
     socket
       .off("update-playing-status")
       .on("update-playing-status", (data: { value: boolean }) => {
-        if (!player) return;
-
+        console.log("status listen from memberroom ", data);
+        if (!playerRef.current) return;
+        if (isRemoteAction.current) {
+          isRemoteAction.current = false;
+          return;
+        }
         if (data.value) {
-          player.playVideo();
+          setIsPlaying(true);
         } else {
-          player.pauseVideo();
-          setCurrentPlayingId(null); // ✅ Reset UI state when paused
-          setSelectedTrack(null);
+          playerRef.current.pauseVideo();
+          setIsPlaying(false);
         }
       });
 
     socket.off("clear-state").on("clear-state", () => {
+      if (socket && socket.connected) {
+        socket.disconnect();
+      }
       navigate("/");
       toast.error("Host has left the room");
     });
-  }, [socket, navigate, player, tracks]);
+  }, [socket, navigate, playerRef.current, tracks]);
 
   const handlePlayPause = ({ id, index }: { id: string; index: number }) => {
+    // If the same track is already selected
     if (currentPlayingId === id) {
-      // Pause
-      setCurrentPlayingId(null);
-      if (player) player.pauseVideo();
-
-      socket.emit("update-playing-status", { value: false });
+      if (isPlaying) {
+        // Pause
+        playerRef.current?.pauseVideo();
+        isRemoteAction.current = true;
+        socket.emit("update-playing-status", { value: false });
+        setIsPlaying(false);
+      } else {
+        // Resume
+        playerRef.current?.playVideo();
+        isRemoteAction.current = true;
+        socket.emit("update-playing-status", { value: true });
+        setIsPlaying(true);
+      }
     } else {
-      // Play
+      // Play a new track
+      setCurrentPlayingId(id);
       const track = tracks.find((t: any) => t.id === id);
-      if (!track) return;
-
       setSelectedTrack(track);
-      setCurrentPlayingId(track.id);
 
+      // emit current track index
       socket.emit("update-current-playing", { index });
+
+      // emit playing status
+      isRemoteAction.current = true;
       socket.emit("update-playing-status", { value: true });
 
-      if (player) {
-        player.loadVideoById(track.videoId);
-        player.playVideo();
+      if (playerRef.current && track) {
+        playerRef.current.loadVideoById(track.videoId);
+        playerRef.current.playVideo();
+        console.log("playerRef.current video load", playerRef.current);
       }
+      // player.playVideo()
+      setIsPlaying(true);
     }
   };
-
-  // const handleTrackSelect = (track: any, index: number) => {
-  //   setSelectedTrack(track);
-  //   setCurrentPlayingId(track.id);
-
-  //   socket.emit("update-current-playing", { index });
-  //   socket.emit("update-playing-status", { value: true });
-
-  //   if (player) {
-  //     player.loadVideoById(track.videoId);
-  //     player.playVideo();
-  //   }
-  // };
 
   const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -163,51 +226,42 @@ const MemberRoom = ({ tracks, roomId }: any) => {
   };
 
   return (
-    <div className="flex flex-col items-center justify-center min-h-screen text-white relative p-5 pt-10 ">
+    <div className="flex flex-col items-center justify-center min-h-screen text-white relative p-5 max-lg:pt-15">
       <div className="py-3 flex items-center justify-center gap-5">
         <Heading text="Welcome to the Room :" />
-        <h1 className="text-center text-4xl font-semibold text-white">
+        <h1 className="text-center text-2xl  sm:text-4xl font-semibold text-white">
           {roomId}
         </h1>
       </div>
-      <div className="flex max-md:flex-col gap-4 w-full flex-1 Video&TracksContainer">
-        <div className="flex-1 md:max-w-[500px] space-y-4">
+      <div className="flex max-lg:flex-col gap-4 w-full flex-1 Video&TracksContainer">
+        <div className="flex-1 lg:max-w-[500px] space-y-4 VideoContainer">
           <div className=" bg-black/20 rounded-xl border-1 border-white/20 VideoContainer p-5">
             <div className="flex flex-col items-center justify-center">
-              <div>
-                {selectedTrack ? (
-                  <YouTube
-                    videoId={extractYouTubeId(selectedTrack?.url)}
-                    opts={{
-                      height: "150",
-                      width: "280",
-                      playerVars: { autoplay: 1 },
-                    }}
-                    onReady={(event) => setPlayer(event.target)} // store player instance
-                  />
-                ) : (
-                  // Default black screen placeholder
-                  <div className="w-[280px] h-[150px] bg-black rounded-md flex items-center justify-center text-white/40">
-                    <img src={yt} alt="yt logo" className="w-20 h-20" />
-                  </div>
-                )}
+              <div className="flex flex-col items-center justify-center gap-5">
+                <div
+                  ref={containerRef}
+                  className="w-[280px] h-[150px] bg-black rounded-md"
+                />
               </div>
               <hr className="border-white/20 w-full mt-5" />
               <div className="flex items-center justify-between h-20 w-full">
-                <div className="w-1/10 h-0.5 p-5"></div>
-                <div className="flex items-center justify-center gap-10 p-5">
+                <div className="w-1/10 h-0.5 p-5 hidden sm:block"></div>
+                <div
+                  className={`flex items-center justify-center gap-5 sm:gap-10 p-5 videoControls ${
+                    !allowMemberToPlay ? "opacity-50 pointer-events-none" : ""
+                  }`}
+                >
                   <div
                     className="hover:bg-white/30 p-2 rounded-full group hover:cursor-pointer"
                     onClick={() => handleSkip("prev")}
                   >
-                    <SkipBack className="w-6 h-6 group-hover:fill-blue-400" />
+                    <SkipBack className="max-w-6 max-h-6 group-hover:fill-blue-400" />
                   </div>
 
                   <div
                     className="hover:bg-white/30 p-2 rounded-full group hover:cursor-pointer"
                     onClick={() => {
                       if (selectedTrack) {
-                        // If a track is already selected, toggle play/pause
                         handlePlayPause({
                           id: selectedTrack.id,
                           index: tracks.findIndex(
@@ -215,15 +269,14 @@ const MemberRoom = ({ tracks, roomId }: any) => {
                           ),
                         });
                       } else if (tracks.length > 0) {
-                        // If no track is selected yet, start the first track
                         handlePlayPause({ id: tracks[0].id, index: 0 });
                       }
                     }}
                   >
-                    {currentPlayingId ? (
-                      <Pause className="w-6 h-6 group-hover:fill-red-400" />
+                    {isPlaying ? (
+                      <Pause className="max-w-6 max-h-6 group-hover:fill-red-400" />
                     ) : (
-                      <Play className="w-6 h-6 group-hover:fill-green-400" />
+                      <Play className="max-w-6 max-h-6 group-hover:fill-green-400" />
                     )}
                   </div>
 
@@ -231,25 +284,55 @@ const MemberRoom = ({ tracks, roomId }: any) => {
                     className="hover:bg-white/30 p-2 rounded-full group hover:cursor-pointer"
                     onClick={() => handleSkip("next")}
                   >
-                    <SkipForward className="w-6 h-6 group-hover:fill-blue-400" />
+                    <SkipForward className="max-w-6 max-h-6 group-hover:fill-blue-400" />
                   </div>
                 </div>
+
                 <div
-                  className="p-5 videoShare hover:bg-white/30 rounded-full hover:cursor-pointer"
+                  className="p-5 videoShare hover:bg-white/30 rounded-full hover:cursor-pointer max-[400px]:hidden"
                   onClick={() => {
-                    navigator.clipboard.writeText(selectedTrack?.url);
-                    toast.success("Video link copied!");
+                    if (!selectedTrack)
+                      toast.error("Please Play the track first !!");
+                    else {
+                      navigator.clipboard.writeText(selectedTrack?.url);
+                      toast.success("Video link copied!");
+                    }
                   }}
                 >
-                  <Share2 />
+                  <Share2 className="max-w-6 max-h-6" />
                 </div>
               </div>
-              <div className="flex items-center justify-center w-full gap-5">
-                <input type="range" className="w-full h-full" />
+              <div className="flex items-center justify-center w-full gap-5 VideoVolume">
+                {allowMemberControlVolume && (
+                  <input
+                    type="range"
+                    value={volume}
+                    min="0"
+                    max="100"
+                    onChange={(e) => {
+                      socket.emit("update-volume", volume);
+                      if (playerRef.current)
+                        playerRef.current.setVolume(Number(e.target.value));
+                      setVolume(Number(e.target.value));
+                    }}
+                    className="w-full h-full"
+                  />
+                )}
               </div>
             </div>
           </div>
-          <div className="flex flex-col items-center justify-center gap-2  my-5 p-5 bg-black/20 rounded-xl border-1 border-white/20 AddtrackContainer">
+          {allowMemberToSync && (
+            <button
+              onClick={() => {
+                socket.emit("sync-request");
+              }}
+              className="flex gap-3 py-3 px-5 bg-black/30 rounded-xl hover:bg-black hover:scale-105 duration-500 hover:cursor-pointer mx-auto"
+            >
+              Sync with host <RefreshCcw />
+            </button>
+          )}
+
+          <div className="flex flex-col items-center justify-center gap-2 p-5 bg-black/20 rounded-xl border-1 border-white/20 AddtrackContainer">
             <div className="border-b-1 border-white/80 p-3">
               <h1 className="text-2xl font-semibold tracking-wide text-center">
                 Add New Track
@@ -280,18 +363,18 @@ const MemberRoom = ({ tracks, roomId }: any) => {
                     className="bg-black/40 hover:bg-black text-white rounded-xl px-6 py-3 w-full h-full hover:cursor-pointer duration-300 flex items-center justify-center gap-2"
                   >
                     Add
-                    <Plus className="w-5 h-5" />
+                    <Plus className="max-w-5 max-h-5" />
                   </button>
                 </div>
               </form>
             </div>
           </div>
         </div>
-        <div className="flex-1 gap-2 p-5 bg-black/20 rounded-xl border-1 border-white/20 TracksListContainer">
+        <div className="flex-1 gap-2 p-2 sm:p-5 max-sm:pt-10 bg-black/20 rounded-xl border-1 border-white/20 TracksListContainer">
           {tracks.length > 0 ? (
-            <div className="flex flex-col items-center justify-center gap-5">
+            <div className="flex flex-col gap-5 items-center justify-center">
               <div className="flex items-center justify-between w-full px-5">
-                <h1 className="self-start text-3xl flex items-center">
+                <h1 className="self-start text-xl sm:text-3xl flex items-center">
                   Tracks : ({tracks.length})
                 </h1>
                 <button
@@ -301,44 +384,74 @@ const MemberRoom = ({ tracks, roomId }: any) => {
                   Clear All
                 </button>
               </div>
-              <div className="flex flex-col items-center justify-center gap-2 p-5 w-full">
-                {tracks?.map((track: any, index: number) => {
-                  const isPlaying = currentPlayingId === track.id;
-                  return (
-                    <div
-                      key={index}
-                      className="flex items-center justify-between gap-2 p-2 bg-black/20 rounded-xl border-1 border-white/20 w-full h-20 px-10"
-                    >
-                      <div className="flex flex-col ">
-                        <h1 className="text-xl font-semibold tracking-wide my-1 text-left line-clamp-1 overflow-hidden">
-                          {track.title}
-                        </h1>
-                        <p className="text-sm text-white/30 ">Track:{index}</p>
-                      </div>
-                      <div className="flex items-center justify-center gap-10">
-                        <div
-                          className="hover:bg-white/30 p-2 rounded-full group hover:cursor-pointer"
-                          onClick={() =>
-                            handlePlayPause({ id: track.id, index })
-                          }
-                        >
-                          {isPlaying ? (
-                            <Pause className="w-5 h-5 group-hover:fill-red-400 group-hover:scale-115" />
-                          ) : (
-                            <Play className="w-5 h-5 group-hover:fill-green-400 group-hover:scale-115" />
-                          )}
-                        </div>
+              <div className="flex-1 w-full overflow-y-auto max-h-[540px] sm:px-5">
+                <Reorder.Group
+                  axis="y"
+                  values={tracks}
+                  onReorder={(newOrder) => {
+                    setLocalTracks(newOrder);
+                    socket.emit("update-tracks", { tracks: newOrder });
+                  }}
+                  className="flex flex-col items-center justify-center gap-2 p-5 w-full TrackLists"
+                >
+                  {tracks.map((track: any, index: number) => {
+                    const isActive = currentPlayingId === track.id;
 
-                        <div className="hover:bg-white/30 p-2 rounded-full group hover:cursor-pointer">
-                          <Trash
-                            onClick={() => handleDeleteTrack(track.id)}
-                            className="w-5 h-5 group-hover:fill-red-400 group-hover:scale-115 group-hover:cursor-pointer"
-                          />
+                    return (
+                      <Reorder.Item
+                        key={track.id}
+                        value={track}
+                        whileDrag={{ scale: 1.05 }}
+                        whileHover={{ scale: 1.02 }}
+                        transition={{
+                          type: "spring",
+                          stiffness: 300,
+                          damping: 25,
+                        }}
+                        className={`flex items-center justify-between gap-2 p-2 rounded-xl border-1 ${
+                          isActive && isPlaying
+                            ? "border-white bg-white/20"
+                            : "border-white/20 bg-black/20"
+                        } w-full h-20 px-10`}
+                      >
+                        <div className="flex flex-col">
+                          <h1 className="text-xl font-semibold tracking-wide my-1 text-left line-clamp-1 overflow-hidden break-all">
+                            {track.title}
+                          </h1>
+                          <p className="text-sm text-white/30 line-clamp-1 overflow-hidden break-all">
+                            Track: {index + 1}
+                          </p>
                         </div>
-                      </div>
-                    </div>
-                  );
-                })}
+                        <div className="flex items-center justify-center gap-10">
+                          <div
+                            className={`hover:bg-white/30 p-2 rounded-full group ${
+                              !allowMemberToPlay
+                                ? "opacity-50 cursor-not-allowed"
+                                : "hover:cursor-pointer"
+                            }`}
+                            onClick={() =>
+                              allowMemberToPlay &&
+                              handlePlayPause({ id: track.id, index })
+                            }
+                          >
+                            {isActive && isPlaying ? (
+                              <Pause className="w-5 h-5 group-hover:fill-red-400 group-hover:scale-115" />
+                            ) : (
+                              <Play className="w-5 h-5 group-hover:fill-green-400 group-hover:scale-115" />
+                            )}
+                          </div>
+
+                          <div className="hover:bg-white/30 p-2 rounded-full group hover:cursor-pointer">
+                            <Trash
+                              onClick={() => handleDeleteTrack(track.id)}
+                              className="w-5 h-5 group-hover:fill-red-400 group-hover:scale-115 group-hover:cursor-pointer"
+                            />
+                          </div>
+                        </div>
+                      </Reorder.Item>
+                    );
+                  })}
+                </Reorder.Group>
               </div>
             </div>
           ) : (
