@@ -251,7 +251,7 @@ const HostRoom = ({ roomId }: any) => {
         });
       }
     });
-  }, [socket, selectedTrack]);
+  }, [socket, selectedTrack ]);
 
   return (
     <div className="flex flex-col items-center justify-center min-h-screen text-white relative p-5 max-lg:pt-15">
@@ -395,7 +395,7 @@ const HostRoom = ({ roomId }: any) => {
                   Clear All
                 </button>
               </div>
-              <div className="flex-1 w-full overflow-y-auto max-h-[550px] sm:px-5">
+              <div className="flex-1 w-full overflow-y-auto max-[2200px]:max-h-[550px] sm:px-5">
                 <Reorder.Group
                   axis="y"
                   values={tracks}

@@ -300,7 +300,7 @@ const MemberRoom = ({
   };
 
   return (
-    <div className="flex flex-col items-center justify-center min-h-screen text-white relative p-5 max-lg:pt-15">
+    <div className="flex flex-col items-center justify-center max-[2200px]:h-screen text-white relative p-5 max-lg:pt-15 ">
       <div className="py-3 flex items-center justify-center gap-5">
         <Heading text="Welcome to the Room :" />
         <h1 className="text-center text-2xl  sm:text-4xl font-semibold text-white">
@@ -315,10 +315,7 @@ const MemberRoom = ({
                 <div className="relative">
                   {/* Always mount the YouTube player */}
                   <div className={`${syncActive ? "block" : "invisible"}`}>
-                    <div
-                      ref={containerRef}
-                      className={`w-[280px] h-[150px]`}
-                    />
+                    <div ref={containerRef} className={`w-[280px] h-[150px]`} />
                   </div>
 
                   {/* Overlay fallback UI when sync is OFF */}
@@ -467,7 +464,7 @@ const MemberRoom = ({
             </div>
           </div>
         </div>
-        <div className="flex-1 gap-2 p-2 sm:p-5 max-sm:pt-10 bg-black/20 rounded-xl border-1 border-white/20 TracksListContainer">
+        <div className="flex-1 gap-2 p-2 sm:p-5 max-sm:pt-10 bg-black/20 rounded-xl border-1 border-white/20 TracksListContainer max-h-[660px]">
           {tracks.length > 0 ? (
             <div className="flex flex-col gap-5 items-center justify-center">
               <div className="flex items-center justify-between w-full px-5">
@@ -481,7 +478,7 @@ const MemberRoom = ({
                   Clear All
                 </button>
               </div>
-              <div className="flex-1 w-full overflow-y-auto max-h-[540px] sm:px-5">
+              <div className="flex-1 w-full overflow-y-auto max-[2200px]:max-h-[550px] sm:px-5">
                 <Reorder.Group
                   axis="y"
                   values={tracks}

@@ -33,7 +33,7 @@ const Home = () => {
   };
 
   return (
-    <div className="flex flex-col items-center justify-between h-screen text-white relative">
+    <div className="flex flex-col items-center max-[2200px]:justify-between justify-center min-[2200px]:gap-10 h-screen text-white relative">
       <div className="flex justify-center items-center w-full mt-10">
         <img
           loading="lazy"
@@ -42,7 +42,7 @@ const Home = () => {
           className=" w-auto h-10 sm:h-15 xl:h-25"
         />
       </div>
-      <div className="flex flex-col items-center justify-center w-full h-full gap-5 ">
+      <div className="flex flex-col items-center justify-center w-full max-[2200px]:h-full h-fit gap-5 ">
         <Heading text="Welcome to the ShareVID" />
         <h1 className="text-center text-sm xl:text-2xl">
           The Live Streaming Platform for your Family and Friends
