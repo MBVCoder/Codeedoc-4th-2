@@ -13,6 +13,7 @@ import {
   SkipForward,
   Share2,
   Pause,
+  Volume,
 } from "lucide-react";
 import { Reorder } from "framer-motion";
 
@@ -21,7 +22,6 @@ const HostRoom = ({ roomId }: any) => {
   // console.log("Socket in HostRoom :", socket);
   const navigate = useNavigate();
   const { socket } = useContext(SocketContext);
-  const isRemoteAction = useRef(false);
   const [tracks, setTracks] = useState([]);
   const [selectedTrack, setSelectedTrack] = useState<any>(null);
   const [videoUrl, setVideoUrl] = useState<any>("");
@@ -48,12 +48,10 @@ const HostRoom = ({ roomId }: any) => {
 
     playerRef.current.on("stateChange", (event: any) => {
       if (event.data === 1) {
-        console.log("state change", event);
-        console.log("Playing");
+        // socket.emit("update-playing-status", { value: true });
         setIsPlaying(true);
       } else if (event.data === 2) {
-        console.log("state change", event);
-        console.log("Paused");
+        // socket.emit("update-playing-status", { value: false });
         setIsPlaying(false); // PAUSED
       } else if (event.data === 0) {
         setIsPlaying(false); // ENDED
@@ -75,35 +73,31 @@ const HostRoom = ({ roomId }: any) => {
       console.log("Room Tracks in HostRoom :", data);
       setTracks(data);
     });
-    // Handle track change
+    socket.off("clear-state").on("clear-state", () => {
+      navigate("/");
+      toast.error("Host has left the room");
+    });
+    // When anyone changes current track by index
     socket
       .off("update-current-playing")
       .on("update-current-playing", (data: { index: number }) => {
-        console.log("index listen from memberroom ", data);
         const next = (tracks as any[])[data.index];
         if (!next) return;
 
         setSelectedTrack(next);
         setCurrentPlayingId(next.id);
 
-        console.log("playerRef.current", playerRef.current);
-
         if (playerRef.current) {
           playerRef.current.loadVideoById(next.videoId);
         }
       });
 
-    // Handle play/pause
     socket
       .off("update-playing-status")
-      .on("update-playing-status", (data: { value: boolean }) => {
-        console.log("status listen from memberroom ", data);
+      .on("update-playing-status", (data: boolean) => {
         if (!playerRef.current) return;
-        if (isRemoteAction.current) {
-          isRemoteAction.current = false;
-          return;
-        }
-        if (data.value) {
+        if (data) {
+          playerRef.current.playVideo();
           setIsPlaying(true);
         } else {
           playerRef.current.pauseVideo();
@@ -111,48 +105,44 @@ const HostRoom = ({ roomId }: any) => {
         }
       });
 
-    // Add new event listener for sync-request
-    socket.off("sync-request").on("sync-request", async () => {
+    socket.off("sync-request").on("sync-request", () => {
       if (!playerRef.current) return;
 
-      // Get the current player state and video details
-      const currentTime = await playerRef.current.getCurrentTime();
-      const playerState = await playerRef.current.getPlayerState();
-      const videoId = selectedTrack?.videoId || "";
+      const videoData = playerRef.current.getVideoData();
+      const videoId = videoData?.video_id || "";
+      const currentTime = playerRef.current.getCurrentTime
+        ? playerRef.current.getCurrentTime()
+        : 0;
+      const playerState = playerRef.current.getPlayerState
+        ? playerRef.current.getPlayerState()
+        : -1;
 
-      // Emit the sync-response with the current state data
       socket.emit("sync-response", {
-        currentTime: currentTime,
-        playerState: playerState,
-        videoId: videoId,
-        time: Date.now(),
         type: "TIME",
+        playerState,
+        time: Date.now(),
+        currentTime,
+        videoId,
       });
-      console.log("Sync response sent to member.");
     });
+  }, [socket, playerRef.current, tracks, navigate]);
 
-    socket.off("clear-state").on("clear-state", () => {
-      if (socket && socket.connected) {
-        socket.disconnect();
-      }
-      navigate("/");
-      toast.error("Host has left the room");
+  useEffect(() => {
+    socket.off("update-volume").on("update-volume", (data: any) => {
+      setVolume(data);
     });
-  }, [socket, navigate, playerRef.current, tracks]);
+  }, [volume]);
 
   const handlePlayPause = ({ id, index }: { id: string; index: number }) => {
-    // If the same track is already selected
     if (currentPlayingId === id) {
       if (isPlaying) {
         // Pause
         playerRef.current?.pauseVideo();
-        isRemoteAction.current = true;
         socket.emit("update-playing-status", { value: false });
         setIsPlaying(false);
       } else {
         // Resume
         playerRef.current?.playVideo();
-        isRemoteAction.current = true;
         socket.emit("update-playing-status", { value: true });
         setIsPlaying(true);
       }
@@ -166,16 +156,14 @@ const HostRoom = ({ roomId }: any) => {
       socket.emit("update-current-playing", { index });
 
       // emit playing status
-      isRemoteAction.current = true;
       socket.emit("update-playing-status", { value: true });
 
       if (playerRef.current && track) {
         playerRef.current.loadVideoById(track.videoId);
         playerRef.current.playVideo();
         console.log("playerRef.current video load", playerRef.current);
+        setIsPlaying(true);
       }
-      // player.playVideo()
-      setIsPlaying(true);
     }
   };
 
@@ -234,17 +222,48 @@ const HostRoom = ({ roomId }: any) => {
     handlePlayPause({ id: newTrack.id, index: newIndex }); // reuses existing play/pause logic (syncs everything)
   };
 
+  // useEffect(() => {
+  //   socket
+  //     .off("update-current-playing")
+  //     .on("update-current-playing", (data: { index: number }) => {
+  //       const next = tracks[data.index];
+  //       if (!next) return;
+
+  //       setSelectedTrack(next);
+  //       setCurrentPlayingId(next.id);
+
+  //       if (playerRef.current) {
+  //         playerRef.current.loadVideoById(next.videoId);
+  //       }
+  //     });
+  // });
+
+  // useEffect(() => {
+  //   socket
+  //     .off("update-playing-status")
+  //     .on("update-playing-status", (data: boolean) => {
+  //       if (!playerRef.current) return;
+  //       if (data) {
+  //         playerRef.current.playVideo();
+  //         setIsPlaying(true);
+  //       } else {
+  //         playerRef.current.pauseVideo();
+  //         setIsPlaying(false);
+  //       }
+  //     });
+  // });
+
   return (
     <div className="flex flex-col items-center justify-center min-h-screen text-white relative p-5 max-lg:pt-15">
       <div className="py-3 flex items-center justify-center gap-5">
         <Heading text="Welcome to the Room :" />
-        <h1 className="text-center text-2xl  sm:text-4xl font-semibold text-white">
+        <h1 className="text-center text-2xl sm:text-4xl font-semibold text-white">
           {roomId}
         </h1>
       </div>
       <div className="flex max-lg:flex-col gap-4 w-full flex-1 Video&TracksContainer">
-        <div className="flex-1 lg:max-w-[500px] space-y-4 VideoContainer">
-          <div className=" bg-black/20 rounded-xl border-1 border-white/20 VideoContainer p-5">
+        <div className="flex-1 lg:max-w-[500px] space-y-4 videoContainer">
+          <div className=" bg-black/20 rounded-xl border-1 border-white/20 VideoContainer p-5 ">
             <div className="flex flex-col items-center justify-center">
               <div className="flex flex-col items-center justify-center gap-5">
                 <div
@@ -252,12 +271,12 @@ const HostRoom = ({ roomId }: any) => {
                   className="w-[280px] h-[150px] bg-black rounded-md"
                 />
               </div>
+
               <hr className="border-white/20 w-full mt-5" />
               <div className="flex items-center justify-between h-20 w-full">
                 <div className="w-1/10 h-0.5 p-5 hidden sm:block"></div>
-                <div
-                  className={`flex items-center justify-center gap-5 sm:gap-10 p-5 videoControls`}
-                >
+
+                <div className="flex items-center justify-center gap-5 sm:gap-10 p-5 videoControls">
                   <div
                     className="hover:bg-white/30 p-2 rounded-full group hover:cursor-pointer"
                     onClick={() => handleSkip("prev")}
@@ -269,6 +288,7 @@ const HostRoom = ({ roomId }: any) => {
                     className="hover:bg-white/30 p-2 rounded-full group hover:cursor-pointer"
                     onClick={() => {
                       if (selectedTrack) {
+                        // If a track is already selected, toggle play/pause
                         handlePlayPause({
                           id: selectedTrack.id,
                           index: tracks.findIndex(
@@ -276,6 +296,7 @@ const HostRoom = ({ roomId }: any) => {
                           ),
                         });
                       } else if (tracks.length > 0) {
+                        // If no track is selected yet, start the first track
                         handlePlayPause({ id: tracks[0].id, index: 0 });
                       }
                     }}
@@ -312,9 +333,9 @@ const HostRoom = ({ roomId }: any) => {
               <div className="flex items-center justify-center w-full gap-5 VideoVolume">
                 <input
                   type="range"
-                  value={volume}
                   min="0"
                   max="100"
+                  value={volume}
                   onChange={(e) => {
                     socket.emit("update-volume", volume);
                     if (playerRef.current)
@@ -326,8 +347,7 @@ const HostRoom = ({ roomId }: any) => {
               </div>
             </div>
           </div>
-
-          <div className="flex flex-col items-center justify-center gap-2 p-5 bg-black/20 rounded-xl border-1 border-white/20 AddtrackContainer">
+          <div className="flex flex-col items-center justify-center gap-2  my-5 p-5 bg-black/20 rounded-xl border-1 border-white/20 AddtrackContainer">
             <div className="border-b-1 border-white/80 p-3">
               <h1 className="text-2xl font-semibold tracking-wide text-center">
                 Add New Track
@@ -365,11 +385,11 @@ const HostRoom = ({ roomId }: any) => {
             </div>
           </div>
         </div>
-        <div className="flex-1 gap-2 p-2 sm:p-5 max-sm:pt-10 bg-black/20 rounded-xl border-1 border-white/20 TracksListContainer">
+        <div className="flex-1 gap-2 p-2 max-sm:pt-10 sm:p-5 bg-black/20 rounded-xl border-1 border-white/20 TracksListContainer">
           {tracks.length > 0 ? (
-            <div className="flex flex-col gap-5 items-center justify-center">
+            <div className="flex flex-col items-center justify-center gap-5">
               <div className="flex items-center justify-between w-full px-5">
-                <h1 className="self-start text-xl sm:text-3xl flex items-center">
+                <h1 className="self-start text-xl sm:text-3xl flex items-center max-sm:my-auto">
                   Tracks : ({tracks.length})
                 </h1>
                 <button
@@ -379,7 +399,7 @@ const HostRoom = ({ roomId }: any) => {
                   Clear All
                 </button>
               </div>
-              <div className="flex-1 w-full overflow-y-auto max-h-[540px] sm:px-5">
+              <div className="flex-1 w-full overflow-y-auto max-h-[550px] sm:px-5">
                 <Reorder.Group
                   axis="y"
                   values={tracks}
@@ -390,7 +410,7 @@ const HostRoom = ({ roomId }: any) => {
                   className="flex flex-col items-center justify-center gap-2 p-5 w-full TrackLists"
                 >
                   {tracks.map((track: any, index: number) => {
-                    const isActive = currentPlayingId === track.id;
+                    const isThisTrack = currentPlayingId === track.id;
 
                     return (
                       <Reorder.Item
@@ -404,12 +424,12 @@ const HostRoom = ({ roomId }: any) => {
                           damping: 25,
                         }}
                         className={`flex items-center justify-between gap-2 p-2 rounded-xl border-1 ${
-                          isActive && isPlaying
+                          isThisTrack && isPlaying
                             ? "border-white bg-white/20"
                             : "border-white/20 bg-black/20"
                         } w-full h-20 px-10`}
                       >
-                        <div className="flex flex-col">
+                        <div className="flex flex-col ">
                           <h1 className="text-xl font-semibold tracking-wide my-1 text-left line-clamp-1 overflow-hidden break-all">
                             {track.title}
                           </h1>
@@ -419,18 +439,17 @@ const HostRoom = ({ roomId }: any) => {
                         </div>
                         <div className="flex items-center justify-center gap-10">
                           <div
-                            className={`hover:bg-white/30 p-2 rounded-full group hover:cursor-pointer`}
+                            className="hover:bg-white/30 p-2 rounded-full group hover:cursor-pointer"
                             onClick={() =>
                               handlePlayPause({ id: track.id, index })
                             }
                           >
-                            {isActive && isPlaying ? (
+                            {isThisTrack && isPlaying ? (
                               <Pause className="w-5 h-5 group-hover:fill-red-400 group-hover:scale-115" />
                             ) : (
                               <Play className="w-5 h-5 group-hover:fill-green-400 group-hover:scale-115" />
                             )}
                           </div>
-
                           <div className="hover:bg-white/30 p-2 rounded-full group hover:cursor-pointer">
                             <Trash
                               onClick={() => handleDeleteTrack(track.id)}

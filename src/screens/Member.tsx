@@ -17,6 +17,7 @@ const Member = () => {
   const [allowMemberToSync, setallowMemberToSync] = useState(false);
   const [allowMemberControlVolume, setallowMemberControlVolume] =
     useState(false);
+  const [index, setIndex] = useState(0);
 
   const handleSubmit = (e: any) => {
     e.preventDefault();
@@ -42,6 +43,7 @@ const Member = () => {
           setallowMemberToPlay(data.allowMemberToPlay);
           setallowMemberToSync(data.allowMemberToSync);
           setallowMemberControlVolume(data.allowMemberControlVolume);
+          setIndex(data.currentPlaying);
         }
       });
       socket.off("room-tracks").on("room-tracks", (data: any) => {
@@ -52,7 +54,16 @@ const Member = () => {
   }, [socket, navigate, handleSubmit]);
 
   if (roomJoined) {
-    return <MemberRoom tracks={tracks} roomId={roomId} allowMemberToPlay={allowMemberToPlay} allowMemberToSync={allowMemberToSync} allowMemberControlVolume={allowMemberControlVolume} />;
+    return (
+      <MemberRoom
+        tracks={tracks}
+        roomId={roomId}
+        allowMemberToPlay={allowMemberToPlay}
+        allowMemberToSync={allowMemberToSync}
+        allowMemberControlVolume={allowMemberControlVolume}
+        joinPlayingIndex={index}
+      />
+    );
   }
 
   return (

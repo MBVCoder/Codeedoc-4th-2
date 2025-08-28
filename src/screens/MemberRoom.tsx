@@ -15,7 +15,6 @@ import {
 import Heading from "../components/Heading";
 import YouTubePlayer from "youtube-player";
 import { extractYouTubeId } from "../components/ExtractYoutubeId";
-import yt from "../assets/yt.svg";
 import { Reorder } from "framer-motion";
 
 const MemberRoom = ({
@@ -24,12 +23,13 @@ const MemberRoom = ({
   allowMemberControlVolume,
   allowMemberToPlay,
   allowMemberToSync,
+  joinPlayingIndex,
 }: any) => {
   // console.log("Socket in MemberRoom :", socket);
   const navigate = useNavigate();
-  const isRemoteAction = useRef(false);
   const { socket } = useContext(SocketContext);
   const [selectedTrack, setSelectedTrack] = useState<any>(null);
+  // const [syncActive, setSyncActive] = useState(false);
   const [videoUrl, setVideoUrl] = useState<any>("");
   const [trackName, setTrackName] = useState<any>("");
   const [currentPlayingId, setCurrentPlayingId] = useState<string | null>(null);
@@ -40,25 +40,35 @@ const MemberRoom = ({
   const containerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
+    // console.log("local TRacks :", localTracks);
+    // console.log("Join Playing Id :", joinPlayingIndex);
+    if (joinPlayingIndex != null && localTracks[joinPlayingIndex]) {
+      const track = localTracks[joinPlayingIndex];
+      setSelectedTrack(track);
+      setCurrentPlayingId(track.id);
+      setIsPlaying(true);
+    }
+  }, [joinPlayingIndex]);
+
+  useEffect(() => {
     if (!containerRef.current) return;
 
     playerRef.current = YouTubePlayer(containerRef.current, {
       height: "150",
       width: "280",
-      playerVars: { autoplay: 1, playsinline: 1 , mute: 1 },
+      playerVars: { autoplay: 1, playsinline: 1 },
     });
 
     playerRef.current.on("ready", (event) => {
-      console.log("YouTube player ready");
       console.log(event);
     });
 
     playerRef.current.on("stateChange", (event: any) => {
       if (event.data === 1) {
-        console.log("Playing");
+        // socket.emit("update-playing-status", { value: true });
         setIsPlaying(true);
       } else if (event.data === 2) {
-        console.log("Paused");
+        // socket.emit("update-playing-status", { value: false });
         setIsPlaying(false); // PAUSED
       } else if (event.data === 0) {
         setIsPlaying(false); // ENDED
@@ -82,43 +92,30 @@ const MemberRoom = ({
 
   useEffect(() => {
     if (!socket) {
-      console.log("Socket not available");
       navigate("/");
       return;
     }
-    // Handle track change
+
     socket
       .off("update-current-playing")
       .on("update-current-playing", (data: { index: number }) => {
-        console.log("index listen from memberroom ", data);
-        const next = (tracks as any[])[data.index];
-        if (!next) return;
+        const track = tracks[data.index];
+        if (!track) return;
 
-        setSelectedTrack(next);
-        setCurrentPlayingId(next.id);
-
-        console.log("playerRef.current", playerRef.current);
+        setSelectedTrack(track);
+        setCurrentPlayingId(track.id);
 
         if (playerRef.current) {
-          playerRef.current.loadVideoById(next.videoId);
-          // playerRef.current.playVideo();
+          playerRef.current.loadVideoById(track.videoId);
         }
       });
 
-    // Handle play/pause
     socket
       .off("update-playing-status")
-      .on("update-playing-status", (data: { value: boolean }) => {
-        console.log("status listen from memberroom ", data);
+      .on("update-playing-status", (data: boolean) => {
         if (!playerRef.current) return;
-        if (isRemoteAction.current) {
-          isRemoteAction.current = false;
-          return;
-        }
-        if (data.value) {
-          playerRef.current.playVideo()?.catch((err: any) => {
-            console.warn("Autoplay blocked:", err);
-          });
+
+        if (data) {
           playerRef.current.playVideo();
           setIsPlaying(true);
         } else {
@@ -128,27 +125,26 @@ const MemberRoom = ({
       });
 
     socket.off("clear-state").on("clear-state", () => {
-      if (socket && socket.connected) {
-        socket.disconnect();
-      }
       navigate("/");
       toast.error("Host has left the room");
     });
   }, [socket, navigate, playerRef.current, tracks]);
 
   const handlePlayPause = ({ id, index }: { id: string; index: number }) => {
-    // If the same track is already selected
+    if (!allowMemberToPlay) {
+      toast.info("Members are not allowed to play");
+      return;
+    }
+
     if (currentPlayingId === id) {
       if (isPlaying) {
         // 👉 Pause
         playerRef.current?.pauseVideo();
-        isRemoteAction.current = true;
         socket.emit("update-playing-status", { value: false });
         setIsPlaying(false);
       } else {
         // 👉 Resume
         playerRef.current?.playVideo();
-        isRemoteAction.current = true;
         socket.emit("update-playing-status", { value: true });
         setIsPlaying(true);
       }
@@ -162,16 +158,14 @@ const MemberRoom = ({
       socket.emit("update-current-playing", { index });
 
       // emit playing status
-      isRemoteAction.current = true;
       socket.emit("update-playing-status", { value: true });
 
       if (playerRef.current && track) {
         playerRef.current.loadVideoById(track.videoId);
         playerRef.current.playVideo();
         console.log("playerRef.current video load", playerRef.current);
+        setIsPlaying(true);
       }
-      // player.playVideo()
-      setIsPlaying(true);
     }
   };
 
@@ -229,6 +223,74 @@ const MemberRoom = ({
     const newTrack = tracks[newIndex];
     handlePlayPause({ id: newTrack.id, index: newIndex }); // reuses existing play/pause logic (syncs everything)
   };
+
+  const handleSync = () => {
+    socket.emit("sync-request");
+
+    socket.off("sync-response").on("sync-response", (data: any) => {
+      console.log("Sync Response in MemberRoom:", data);
+
+      if (data.type === "ERROR") {
+        toast.error("Sync Failed");
+        return;
+      }
+
+      if (!playerRef.current) {
+        toast.error("Player not ready yet");
+        return;
+      }
+
+      if (data.type === "TIME") {
+        const { videoId, currentTime, playerState } = data;
+
+        if (videoId) {
+          // Load the video and seek to correct time
+          playerRef.current.loadVideoById(videoId, currentTime);
+
+          // Sync playback state
+          if (playerState === 1) {
+            // Playing
+            playerRef.current.playVideo();
+          } else if (playerState === 2 || playerState === 5) {
+            // Paused or cued
+            playerRef.current.pauseVideo();
+          }
+        } else {
+          toast.info("No video currently playing");
+          playerRef.current.stopVideo();
+        }
+
+        toast.success("Synced with host");
+      }
+    });
+  };
+
+  // useEffect(() => {
+  //   socket.off("update-current-playing").on("update-current-playing", (data: { index: number }) => {
+  //     const next = tracks[data.index];
+  //     if (!next) return;
+
+  //     setSelectedTrack(next);
+  //     setCurrentPlayingId(next.id);
+
+  //     if (playerRef.current) {
+  //       playerRef.current.loadVideoById(next.videoId);
+  //     }
+  //   });
+  // });
+
+  // useEffect(() => {
+  //   socket.off("update-playing-status").on("update-playing-status", (data: boolean) => {
+  //     if (!playerRef.current) return;
+  //     if (data) {
+  //       playerRef.current.playVideo();
+  //       setIsPlaying(true);
+  //     } else {
+  //       playerRef.current.pauseVideo();
+  //       setIsPlaying(false);
+  //     }
+  //   });
+  // });
 
   return (
     <div className="flex flex-col items-center justify-center min-h-screen text-white relative p-5 max-lg:pt-15">
@@ -328,10 +390,7 @@ const MemberRoom = ({
           </div>
           {allowMemberToSync && (
             <button
-              // onClick={handleSync}
-              onClick={() => {
-                socket.emit("sync-request");
-              }}
+              onClick={handleSync}
               className="flex gap-3 py-3 px-5 bg-black/30 rounded-xl hover:bg-black hover:scale-105 duration-500 hover:cursor-pointer mx-auto"
             >
               Sync with host <RefreshCcw />
@@ -401,7 +460,7 @@ const MemberRoom = ({
                   className="flex flex-col items-center justify-center gap-2 p-5 w-full TrackLists"
                 >
                   {tracks.map((track: any, index: number) => {
-                    const isActive = currentPlayingId === track.id;
+                    const isThisTrack = currentPlayingId === track.id;
 
                     return (
                       <Reorder.Item
@@ -415,7 +474,7 @@ const MemberRoom = ({
                           damping: 25,
                         }}
                         className={`flex items-center justify-between gap-2 p-2 rounded-xl border-1 ${
-                          isActive && isPlaying
+                          isThisTrack && isPlaying
                             ? "border-white bg-white/20"
                             : "border-white/20 bg-black/20"
                         } w-full h-20 px-10`}
@@ -440,7 +499,7 @@ const MemberRoom = ({
                               handlePlayPause({ id: track.id, index })
                             }
                           >
-                            {isActive && isPlaying ? (
+                            {isThisTrack && isPlaying ? (
                               <Pause className="w-5 h-5 group-hover:fill-red-400 group-hover:scale-115" />
                             ) : (
                               <Play className="w-5 h-5 group-hover:fill-green-400 group-hover:scale-115" />
