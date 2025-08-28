@@ -296,6 +296,7 @@ const MemberRoom = ({
   };
   const handleSyncOff = () => {
     setSyncActive(false);
+    playerRef.current?.stopVideo();
   };
 
   return (
