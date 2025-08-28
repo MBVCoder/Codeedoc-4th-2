@@ -13,6 +13,8 @@ import {
   RefreshCcw,
   Volume2,
   VolumeOff,
+  Disc2,
+  Disc3,
 } from "lucide-react";
 import Heading from "../components/Heading";
 import YouTubePlayer from "youtube-player";
@@ -42,6 +44,8 @@ const MemberRoom = ({
   const playerRef = useRef<any>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const volumeTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [syncActive, setSyncActive] = useState(false);
+  console.log("Sync Active :", syncActive);
 
   useEffect(() => {
     // console.log("local TRacks :", localTracks);
@@ -288,6 +292,10 @@ const MemberRoom = ({
 
   const handleSync = () => {
     socket.emit("sync-request");
+    setSyncActive(true);
+  };
+  const handleSyncOff = () => {
+    setSyncActive(false);
   };
 
   return (
@@ -303,10 +311,27 @@ const MemberRoom = ({
           <div className=" bg-black/20 rounded-xl border-1 border-white/20 VideoContainer p-5">
             <div className="flex flex-col items-center justify-center">
               <div className="flex flex-col items-center justify-center gap-5">
-                <div
-                  ref={containerRef}
-                  className="w-[280px] h-[150px] bg-black rounded-md"
-                />
+                <div className="relative">
+                  {/* Always mount the YouTube player */}
+                  <div className={`${syncActive ? "block" : "invisible"}`}>
+                    <div
+                      ref={containerRef}
+                      className={`w-[280px] h-[150px]`}
+                    />
+                  </div>
+
+                  {/* Overlay fallback UI when sync is OFF */}
+                  {!syncActive && (
+                    <div className="absolute inset-0 flex gap-3 justify-center items-center bg-black/30 rounded-md w-[280px] h-[150px]">
+                      {isPlaying ? <Disc3 /> : <Disc2 />}
+                      <h1 className="text-2xl">
+                        {selectedTrack
+                          ? selectedTrack.title
+                          : "No Track Selected"}
+                      </h1>
+                    </div>
+                  )}
+                </div>
               </div>
               <hr className="border-white/20 w-full mt-5" />
               <div className="flex items-center justify-between h-20 w-full">
@@ -382,14 +407,26 @@ const MemberRoom = ({
               </div>
             </div>
           </div>
-          {allowMemberToSync && (
-            <button
-              onClick={handleSync}
-              className="flex gap-3 py-3 px-5 bg-black/30 rounded-xl hover:bg-black hover:scale-105 duration-500 hover:cursor-pointer mx-auto"
-            >
-              Sync with host <RefreshCcw />
-            </button>
-          )}
+          {allowMemberToSync &&
+            (syncActive ? (
+              <button
+                onClick={handleSyncOff}
+                className="flex gap-3 py-3 px-5 bg-black/30 rounded-xl hover:bg-black hover:scale-105 duration-500 hover:cursor-pointer mx-auto"
+              >
+                {" "}
+                Pause Sync
+                <RefreshCcw />
+              </button>
+            ) : (
+              <button
+                onClick={handleSync}
+                className="flex gap-3 py-3 px-5 bg-black/30 rounded-xl hover:bg-black hover:scale-105 duration-500 hover:cursor-pointer mx-auto"
+              >
+                {" "}
+                Sync With Host
+                <RefreshCcw />
+              </button>
+            ))}
 
           <div className="flex flex-col items-center justify-center gap-2 p-5 bg-black/20 rounded-xl border-1 border-white/20 AddtrackContainer">
             <div className="border-b-1 border-white/80 p-3">
