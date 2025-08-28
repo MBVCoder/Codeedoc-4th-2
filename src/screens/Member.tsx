@@ -18,6 +18,7 @@ const Member = () => {
   const [allowMemberControlVolume, setallowMemberControlVolume] =
     useState(false);
   const [index, setIndex] = useState(0);
+  const [videoVolume, setVideoVolume] = useState<Number>(100);
 
   const handleSubmit = (e: any) => {
     e.preventDefault();
@@ -44,6 +45,7 @@ const Member = () => {
           setallowMemberToSync(data.allowMemberToSync);
           setallowMemberControlVolume(data.allowMemberControlVolume);
           setIndex(data.currentPlaying);
+          setVideoVolume(data.volume);
         }
       });
       socket.off("room-tracks").on("room-tracks", (data: any) => {
@@ -62,6 +64,7 @@ const Member = () => {
         allowMemberToSync={allowMemberToSync}
         allowMemberControlVolume={allowMemberControlVolume}
         joinPlayingIndex={index}
+        joinVideoVolume={videoVolume}
       />
     );
   }

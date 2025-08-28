@@ -13,7 +13,8 @@ import {
   SkipForward,
   Share2,
   Pause,
-  Volume,
+  Volume2,
+  VolumeOff,
 } from "lucide-react";
 import { Reorder } from "framer-motion";
 
@@ -27,10 +28,11 @@ const HostRoom = ({ roomId }: any) => {
   const [videoUrl, setVideoUrl] = useState<any>("");
   const [trackName, setTrackName] = useState<any>("");
   const [currentPlayingId, setCurrentPlayingId] = useState<string | null>(null);
-  const [volume, setVolume] = useState<Number>(100);
+  const [videoVolume, setVideoVolume] = useState<Number>(100);
   const [isPlaying, setIsPlaying] = useState(false);
   const playerRef = useRef<any>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+  const volumeTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     if (!containerRef.current) return;
@@ -69,6 +71,12 @@ const HostRoom = ({ roomId }: any) => {
       navigate("/");
       return;
     }
+    socket.off("update-volume").on("update-volume", (data: any) => {
+      setVideoVolume(data);
+      if (playerRef.current) {
+        playerRef.current.setVolume(data);
+      }
+    });
     socket.off("room-tracks").on("room-tracks", (data: any) => {
       console.log("Room Tracks in HostRoom :", data);
       setTracks(data);
@@ -104,34 +112,22 @@ const HostRoom = ({ roomId }: any) => {
           setIsPlaying(false);
         }
       });
-
-    socket.off("sync-request").on("sync-request", () => {
-      if (!playerRef.current) return;
-
-      const videoData = playerRef.current.getVideoData();
-      const videoId = videoData?.video_id || "";
-      const currentTime = playerRef.current.getCurrentTime
-        ? playerRef.current.getCurrentTime()
-        : 0;
-      const playerState = playerRef.current.getPlayerState
-        ? playerRef.current.getPlayerState()
-        : -1;
-
-      socket.emit("sync-response", {
-        type: "TIME",
-        playerState,
-        time: Date.now(),
-        currentTime,
-        videoId,
-      });
-    });
   }, [socket, playerRef.current, tracks, navigate]);
 
-  useEffect(() => {
-    socket.off("update-volume").on("update-volume", (data: any) => {
-      setVolume(data);
-    });
-  }, [volume]);
+  const handleVolumeChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const newVolume = Number(e.target.value);
+
+    setVideoVolume(newVolume);
+
+    if (playerRef.current) {
+      playerRef.current.setVolume(newVolume);
+    }
+
+    if (volumeTimeoutRef.current) clearTimeout(volumeTimeoutRef.current);
+    volumeTimeoutRef.current = setTimeout(() => {
+      socket.emit("update-volume", newVolume);
+    }, 300);
+  };
 
   const handlePlayPause = ({ id, index }: { id: string; index: number }) => {
     if (currentPlayingId === id) {
@@ -222,36 +218,40 @@ const HostRoom = ({ roomId }: any) => {
     handlePlayPause({ id: newTrack.id, index: newIndex }); // reuses existing play/pause logic (syncs everything)
   };
 
-  // useEffect(() => {
-  //   socket
-  //     .off("update-current-playing")
-  //     .on("update-current-playing", (data: { index: number }) => {
-  //       const next = tracks[data.index];
-  //       if (!next) return;
+  useEffect(() => {
+    if (!socket) return;
 
-  //       setSelectedTrack(next);
-  //       setCurrentPlayingId(next.id);
+    socket.off("sync-request").on("sync-request", async () => {
+      console.log("Sync Request in HostRoom");
 
-  //       if (playerRef.current) {
-  //         playerRef.current.loadVideoById(next.videoId);
-  //       }
-  //     });
-  // });
+      if (!playerRef.current) {
+        socket.emit("sync-response", {
+          type: "ERROR",
+          message: "Player not ready",
+        });
+        return;
+      }
 
-  // useEffect(() => {
-  //   socket
-  //     .off("update-playing-status")
-  //     .on("update-playing-status", (data: boolean) => {
-  //       if (!playerRef.current) return;
-  //       if (data) {
-  //         playerRef.current.playVideo();
-  //         setIsPlaying(true);
-  //       } else {
-  //         playerRef.current.pauseVideo();
-  //         setIsPlaying(false);
-  //       }
-  //     });
-  // });
+      try {
+        const currentTime = await playerRef.current.getCurrentTime();
+        const playerState = await playerRef.current.getPlayerState();
+
+        socket.emit("sync-response", {
+          type: "TIME",
+          playerState,
+          time: Date.now(),
+          currentTime,
+          videoId: selectedTrack?.videoId || "",
+        });
+      } catch (err) {
+        console.error("Error getting sync data:", err);
+        socket.emit("sync-response", {
+          type: "ERROR",
+          message: "Failed to read player state",
+        });
+      }
+    });
+  }, [socket, selectedTrack]);
 
   return (
     <div className="flex flex-col items-center justify-center min-h-screen text-white relative p-5 max-lg:pt-15">
@@ -331,17 +331,13 @@ const HostRoom = ({ roomId }: any) => {
                 </div>
               </div>
               <div className="flex items-center justify-center w-full gap-5 VideoVolume">
+                {videoVolume === 0 ? <VolumeOff /> : <Volume2 />}
                 <input
                   type="range"
                   min="0"
                   max="100"
-                  value={volume}
-                  onChange={(e) => {
-                    socket.emit("update-volume", volume);
-                    if (playerRef.current)
-                      playerRef.current.setVolume(Number(e.target.value));
-                    setVolume(Number(e.target.value));
-                  }}
+                  value={videoVolume}
+                  onChange={handleVolumeChange}
                   className="w-full h-full"
                 />
               </div>

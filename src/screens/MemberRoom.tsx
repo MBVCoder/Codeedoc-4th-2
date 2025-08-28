@@ -11,6 +11,8 @@ import {
   SkipForward,
   Share2,
   RefreshCcw,
+  Volume2,
+  VolumeOff,
 } from "lucide-react";
 import Heading from "../components/Heading";
 import YouTubePlayer from "youtube-player";
@@ -24,6 +26,7 @@ const MemberRoom = ({
   allowMemberToPlay,
   allowMemberToSync,
   joinPlayingIndex,
+  joinVideoVolume,
 }: any) => {
   // console.log("Socket in MemberRoom :", socket);
   const navigate = useNavigate();
@@ -34,10 +37,11 @@ const MemberRoom = ({
   const [trackName, setTrackName] = useState<any>("");
   const [currentPlayingId, setCurrentPlayingId] = useState<string | null>(null);
   const [localTracks, setLocalTracks] = useState(tracks);
-  const [volume, setVolume] = useState<Number>(100);
+  const [videoVolume, setVideoVolume] = useState<Number>(100);
   const [isPlaying, setIsPlaying] = useState(false);
   const playerRef = useRef<any>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+  const volumeTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     // console.log("local TRacks :", localTracks);
@@ -48,7 +52,25 @@ const MemberRoom = ({
       setCurrentPlayingId(track.id);
       setIsPlaying(true);
     }
-  }, [joinPlayingIndex]);
+    if (joinVideoVolume != null) {
+      setVideoVolume(joinVideoVolume);
+    }
+  }, [joinPlayingIndex, joinVideoVolume]);
+
+  const handleVolumeChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const newVolume = Number(e.target.value);
+
+    setVideoVolume(newVolume);
+
+    if (playerRef.current) {
+      playerRef.current.setVolume(newVolume);
+    }
+
+    if (volumeTimeoutRef.current) clearTimeout(volumeTimeoutRef.current);
+    volumeTimeoutRef.current = setTimeout(() => {
+      socket.emit("update-volume", newVolume);
+    }, 300);
+  };
 
   useEffect(() => {
     if (!containerRef.current) return;
@@ -85,10 +107,13 @@ const MemberRoom = ({
   }, [tracks]);
 
   useEffect(() => {
-    socket.off("update-volume").on("update-volume", (data: any) => {
-      setVolume(data);
+    socket.off("update-volume").on("update-volume", (data: Number) => {
+      setVideoVolume(data);
     });
-  }, [volume]);
+    if (playerRef.current) {
+      playerRef.current.setVolume(videoVolume);
+    }
+  }, [videoVolume]);
 
   useEffect(() => {
     if (!socket) {
@@ -123,6 +148,43 @@ const MemberRoom = ({
           setIsPlaying(false);
         }
       });
+
+    socket.off("sync-response").on("sync-response", (data: any) => {
+      console.log("Sync Response in MemberRoom:", data);
+
+      if (data.type === "ERROR") {
+        toast.error("Sync Failed");
+        return;
+      }
+
+      if (!playerRef.current) {
+        toast.error("Player not ready yet");
+        return;
+      }
+
+      if (data.type === "TIME") {
+        const { videoId, currentTime, playerState } = data;
+
+        if (videoId) {
+          // Load the video and seek to correct time
+          playerRef.current.loadVideoById(videoId, currentTime);
+
+          // Sync playback state
+          if (playerState === 1) {
+            // Playing
+            playerRef.current.playVideo();
+          } else if (playerState === 2 || playerState === 5) {
+            // Paused or cued
+            playerRef.current.pauseVideo();
+          }
+        } else {
+          toast.info("No video currently playing");
+          playerRef.current.stopVideo();
+        }
+
+        toast.success("Synced with host");
+      }
+    });
 
     socket.off("clear-state").on("clear-state", () => {
       navigate("/");
@@ -226,71 +288,7 @@ const MemberRoom = ({
 
   const handleSync = () => {
     socket.emit("sync-request");
-
-    socket.off("sync-response").on("sync-response", (data: any) => {
-      console.log("Sync Response in MemberRoom:", data);
-
-      if (data.type === "ERROR") {
-        toast.error("Sync Failed");
-        return;
-      }
-
-      if (!playerRef.current) {
-        toast.error("Player not ready yet");
-        return;
-      }
-
-      if (data.type === "TIME") {
-        const { videoId, currentTime, playerState } = data;
-
-        if (videoId) {
-          // Load the video and seek to correct time
-          playerRef.current.loadVideoById(videoId, currentTime);
-
-          // Sync playback state
-          if (playerState === 1) {
-            // Playing
-            playerRef.current.playVideo();
-          } else if (playerState === 2 || playerState === 5) {
-            // Paused or cued
-            playerRef.current.pauseVideo();
-          }
-        } else {
-          toast.info("No video currently playing");
-          playerRef.current.stopVideo();
-        }
-
-        toast.success("Synced with host");
-      }
-    });
   };
-
-  // useEffect(() => {
-  //   socket.off("update-current-playing").on("update-current-playing", (data: { index: number }) => {
-  //     const next = tracks[data.index];
-  //     if (!next) return;
-
-  //     setSelectedTrack(next);
-  //     setCurrentPlayingId(next.id);
-
-  //     if (playerRef.current) {
-  //       playerRef.current.loadVideoById(next.videoId);
-  //     }
-  //   });
-  // });
-
-  // useEffect(() => {
-  //   socket.off("update-playing-status").on("update-playing-status", (data: boolean) => {
-  //     if (!playerRef.current) return;
-  //     if (data) {
-  //       playerRef.current.playVideo();
-  //       setIsPlaying(true);
-  //     } else {
-  //       playerRef.current.pauseVideo();
-  //       setIsPlaying(false);
-  //     }
-  //   });
-  // });
 
   return (
     <div className="flex flex-col items-center justify-center min-h-screen text-white relative p-5 max-lg:pt-15">
@@ -370,18 +368,14 @@ const MemberRoom = ({
                 </div>
               </div>
               <div className="flex items-center justify-center w-full gap-5 VideoVolume">
+                {videoVolume === 0 ? <VolumeOff /> : <Volume2 />}
                 {allowMemberControlVolume && (
                   <input
                     type="range"
-                    value={volume}
                     min="0"
                     max="100"
-                    onChange={(e) => {
-                      socket.emit("update-volume", volume);
-                      if (playerRef.current)
-                        playerRef.current.setVolume(Number(e.target.value));
-                      setVolume(Number(e.target.value));
-                    }}
+                    value={videoVolume}
+                    onChange={handleVolumeChange}
                     className="w-full h-full"
                   />
                 )}
