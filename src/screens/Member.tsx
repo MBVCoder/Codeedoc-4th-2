@@ -32,7 +32,7 @@ const Member = () => {
   useEffect(() => {
     inputRef.current?.focus();
     if (!socket) {
-      toast.error("Socket Disconnected!!");
+      // toast.error("Socket Disconnected!!");
       navigate("/");
     } else {
       socket.off("join-room").on("join-room", (data: any) => {

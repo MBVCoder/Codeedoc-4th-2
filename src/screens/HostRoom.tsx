@@ -18,12 +18,12 @@ import {
 } from "lucide-react";
 import { Reorder } from "framer-motion";
 
-const HostRoom = ({ roomId }: any) => {
+const HostRoom = ({ roomId , tracks }: any) => {
   // console.log("Room ID in HostRoom :", roomId);
   // console.log("Socket in HostRoom :", socket);
   const navigate = useNavigate();
   const { socket } = useContext(SocketContext);
-  const [tracks, setTracks] = useState([]);
+  const [LocalTracks, setLocalTracks] = useState(tracks);
   const [selectedTrack, setSelectedTrack] = useState<any>(null);
   const [videoUrl, setVideoUrl] = useState<any>("");
   const [trackName, setTrackName] = useState<any>("");
@@ -33,6 +33,10 @@ const HostRoom = ({ roomId }: any) => {
   const playerRef = useRef<any>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const volumeTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    setLocalTracks(tracks); // Whenever parent updates tracks, sync local
+  }, [tracks]);
 
   useEffect(() => {
     if (!containerRef.current) return;
@@ -77,15 +81,10 @@ const HostRoom = ({ roomId }: any) => {
         playerRef.current.setVolume(data);
       }
     });
-    socket.off("room-tracks").on("room-tracks", (data: any) => {
-      console.log("Room Tracks in HostRoom :", data);
-      setTracks(data);
-    });
     socket.off("clear-state").on("clear-state", () => {
       navigate("/");
       toast.error("Host has left the room");
     });
-    // When anyone changes current track by index
     socket
       .off("update-current-playing")
       .on("update-current-playing", (data: { index: number }) => {
@@ -126,7 +125,7 @@ const HostRoom = ({ roomId }: any) => {
     if (volumeTimeoutRef.current) clearTimeout(volumeTimeoutRef.current);
     volumeTimeoutRef.current = setTimeout(() => {
       socket.emit("update-volume", newVolume);
-    }, 300);
+    }, 10);
   };
 
   const handlePlayPause = ({ id, index }: { id: string; index: number }) => {
@@ -255,7 +254,7 @@ const HostRoom = ({ roomId }: any) => {
 
   return (
     <div className="flex flex-col items-center justify-center min-h-screen text-white relative p-5 max-lg:pt-15">
-      <div className="py-3 flex items-center justify-center gap-5">
+      <div className="py-3 flex max-sm:flex-col items-center justify-center gap-5">
         <Heading text="Welcome to the Room :" />
         <h1 className="text-center text-2xl sm:text-4xl font-semibold text-white">
           {roomId}
@@ -274,7 +273,7 @@ const HostRoom = ({ roomId }: any) => {
 
               <hr className="border-white/20 w-full mt-5" />
               <div className="flex items-center justify-between h-20 w-full">
-                <div className="w-1/10 h-0.5 p-5 hidden sm:block"></div>
+                <div className="size-[64px] h-0.5 p-5"></div>
 
                 <div className="flex items-center justify-center gap-5 sm:gap-10 p-5 videoControls">
                   <div
@@ -317,7 +316,7 @@ const HostRoom = ({ roomId }: any) => {
                 </div>
 
                 <div
-                  className="p-5 videoShare hover:bg-white/30 rounded-full hover:cursor-pointer max-[400px]:hidden"
+                  className="p-5 videoShare hover:bg-white/30 rounded-full hover:cursor-pointer"
                   onClick={() => {
                     if (!selectedTrack)
                       toast.error("Please Play the track first !!");
@@ -400,7 +399,7 @@ const HostRoom = ({ roomId }: any) => {
                   axis="y"
                   values={tracks}
                   onReorder={(newOrder) => {
-                    setTracks(newOrder);
+                    setLocalTracks(newOrder);
                     socket.emit("update-tracks", { tracks: newOrder });
                   }}
                   className="flex flex-col items-center justify-center gap-2 p-5 w-full TrackLists"
@@ -433,7 +432,7 @@ const HostRoom = ({ roomId }: any) => {
                             Track: {index + 1}
                           </p>
                         </div>
-                        <div className="flex items-center justify-center gap-10">
+                        <div className="flex items-center justify-center gap-5 xl:gap-10">
                           <div
                             className="hover:bg-white/30 p-2 rounded-full group hover:cursor-pointer"
                             onClick={() =>

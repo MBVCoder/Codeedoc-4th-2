@@ -17,12 +17,26 @@ const Host = () => {
   const [allowMemberToSync, setallowMemberToSync] = useState(true);
   const [allowMemberControlVolume, setallowMemberControlVolume] =
     useState(true);
+    const [tracks, setTracks] = useState([]);
 
   useEffect(() => {
     inputRef.current?.focus();
     if (!socket) {
-      toast.error("Socket Disconnected!!");
+      // toast.error("Socket Disconnected!!");
       navigate("/");
+    } else {
+      socket.off("join-room").on("join-room", (data: any) => {
+        if (data.type === "ERROR") {
+          toast.error(data.message);
+        } else {
+          setRoomCreated((prev: boolean) => !prev);
+          toast.success("Joined the room");
+        }
+      });
+      socket.off("room-tracks").on("room-tracks", (data: any) => {
+        console.log("Room Tracks in Host:", data);
+        setTracks(data);
+      });
     }
   }, [socket, navigate]);
 
@@ -38,11 +52,10 @@ const Host = () => {
       allowMemberToSync,
       allowMemberControlVolume,
     });
-    setRoomCreated((prev: boolean) => !prev);
   };
 
   if (roomCreated) {
-    return <HostRoom roomId={roomId} />;
+    return <HostRoom roomId={roomId} tracks={tracks} />;
   }
   return (
     <div className="flex flex-col items-center justify-center h-screen text-white relative">
@@ -82,7 +95,7 @@ const Host = () => {
                 onChange={() => setallowMemberToPlay((prev) => !prev)}
                 className="appearance-none size-4 border-1 checked:border-none rounded-sm hover:cursor-pointer checked:bg-green-600 checked:ring-4 ring-blue-900 "
               />
-              <p className="text-md text-center tracking-wide">Allow to play</p>
+              <p className="text-md text-left tracking-wide">Allow to play</p>
             </div>
             <div className="flex gap-3 items-center">
               <input
@@ -91,7 +104,7 @@ const Host = () => {
                 onChange={() => setallowMemberToSync((prev) => !prev)}
                 className="appearance-none size-4 border-1 checked:border-none rounded-sm hover:cursor-pointer checked:bg-green-600 checked:ring-4 ring-blue-900 "
               />
-              <p className="text-md text-center tracking-wide">Allow to sync</p>
+              <p className="text-md text-left tracking-wide">Allow to sync</p>
             </div>
             <div className="flex gap-3 items-center">
               <input
@@ -100,7 +113,9 @@ const Host = () => {
                 onChange={() => setallowMemberControlVolume((prev) => !prev)}
                 className="appearance-none size-4 border-1 checked:border-none rounded-sm hover:cursor-pointer checked:bg-green-600 checked:ring-4 ring-blue-900 "
               />
-              <p className="text-md text-center tracking-wide">Allow to control volume</p>
+              <p className="text-md text-left tracking-wide">
+                Allow to control volume
+              </p>
             </div>
           </div>
         </form>

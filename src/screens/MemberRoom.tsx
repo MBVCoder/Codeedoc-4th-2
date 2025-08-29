@@ -73,7 +73,7 @@ const MemberRoom = ({
     if (volumeTimeoutRef.current) clearTimeout(volumeTimeoutRef.current);
     volumeTimeoutRef.current = setTimeout(() => {
       socket.emit("update-volume", newVolume);
-    }, 300);
+    }, 10);
   };
 
   useEffect(() => {
@@ -124,7 +124,6 @@ const MemberRoom = ({
       navigate("/");
       return;
     }
-
     socket
       .off("update-current-playing")
       .on("update-current-playing", (data: { index: number }) => {
@@ -153,6 +152,10 @@ const MemberRoom = ({
         }
       });
 
+  }, [socket, navigate, playerRef.current, tracks]);
+
+  useEffect(() => {
+    if (!socket) return;
     socket.off("sync-response").on("sync-response", (data: any) => {
       console.log("Sync Response in MemberRoom:", data);
 
@@ -181,20 +184,19 @@ const MemberRoom = ({
             // Paused or cued
             playerRef.current.pauseVideo();
           }
+          toast.success("Synced with host");
         } else {
           toast.info("No video currently playing");
           playerRef.current.stopVideo();
         }
-
-        toast.success("Synced with host");
       }
     });
-
     socket.off("clear-state").on("clear-state", () => {
       navigate("/");
       toast.error("Host has left the room");
+      socket.disconnect();
     });
-  }, [socket, navigate, playerRef.current, tracks]);
+  }, [socket]);
 
   const handlePlayPause = ({ id, index }: { id: string; index: number }) => {
     if (!allowMemberToPlay) {
@@ -264,9 +266,9 @@ const MemberRoom = ({
     setTrackName("");
   };
 
-  const handleDeleteAll = () => {
-    socket.emit("update-tracks", { tracks: [] });
-  };
+  // const handleDeleteAll = () => {
+  //   socket.emit("update-tracks", { tracks: [] });
+  // };
 
   const handleDeleteTrack = (id: string) => {
     socket.emit("update-tracks", {
@@ -300,15 +302,15 @@ const MemberRoom = ({
   };
 
   return (
-    <div className="flex flex-col items-center justify-center max-[2200px]:h-screen text-white relative p-5 max-lg:pt-15 ">
-      <div className="py-3 flex items-center justify-center gap-5">
+    <div className="flex flex-col items-center justify-center min-h-screen text-white relative p-5 max-lg:pt-15 ">
+      <div className="py-3 flex max-sm:flex-col items-center justify-center gap-5">
         <Heading text="Welcome to the Room :" />
         <h1 className="text-center text-2xl  sm:text-4xl font-semibold text-white">
           {roomId}
         </h1>
       </div>
       <div className="flex max-lg:flex-col gap-4 w-full flex-1 Video&TracksContainer">
-        <div className="flex-1 lg:max-w-[500px] space-y-4 VideoContainer">
+        <div className="flex-1 lg:max-w-[500px] space-y-2 VideoContainer">
           <div className=" bg-black/20 rounded-xl border-1 border-white/20 VideoContainer p-5">
             <div className="flex flex-col items-center justify-center">
               <div className="flex flex-col items-center justify-center gap-5">
@@ -325,7 +327,7 @@ const MemberRoom = ({
                       <h1 className="text-2xl">
                         {selectedTrack
                           ? selectedTrack.title
-                          : "No Track Selected"}
+                          : "No Track Playing"}
                       </h1>
                     </div>
                   )}
@@ -333,7 +335,7 @@ const MemberRoom = ({
               </div>
               <hr className="border-white/20 w-full mt-5" />
               <div className="flex items-center justify-between h-20 w-full">
-                <div className="w-1/10 h-0.5 p-5 hidden sm:block"></div>
+                <div className="size-[64px] h-0.5 p-5"></div>
                 <div
                   className={`flex items-center justify-center gap-5 sm:gap-10 p-5 videoControls ${
                     !allowMemberToPlay ? "opacity-50 pointer-events-none" : ""
@@ -377,7 +379,7 @@ const MemberRoom = ({
                 </div>
 
                 <div
-                  className="p-5 videoShare hover:bg-white/30 rounded-full hover:cursor-pointer max-[400px]:hidden"
+                  className="p-5 videoShare hover:bg-white/30 rounded-full hover:cursor-pointer "
                   onClick={() => {
                     if (!selectedTrack)
                       toast.error("Please Play the track first !!");
@@ -390,7 +392,11 @@ const MemberRoom = ({
                   <Share2 className="max-w-6 max-h-6" />
                 </div>
               </div>
-              <div className={`flex items-center justify-center w-full gap-5 VideoVolume ${allowMemberControlVolume ? "block" : "hidden"} `}>
+              <div
+                className={`flex items-center justify-center w-full gap-5 VideoVolume ${
+                  allowMemberControlVolume ? "block" : "hidden"
+                } `}
+              >
                 {videoVolume === 0 ? <VolumeOff /> : <Volume2 />}
                 {allowMemberControlVolume && (
                   <input
@@ -471,12 +477,12 @@ const MemberRoom = ({
                 <h1 className="self-start text-xl sm:text-3xl flex items-center">
                   Tracks : ({tracks.length})
                 </h1>
-                <button
+                {/* <button
                   onClick={handleDeleteAll}
                   className="bg-black/30 hover:bg-black hover:scale-105 duration-300 hover:cursor-pointer px-5 py-2 rounded-2xl"
                 >
                   Clear All
-                </button>
+                </button> */}
               </div>
               <div className="flex-1 w-full overflow-y-auto max-[2200px]:max-h-[550px] sm:px-5">
                 <Reorder.Group
@@ -516,7 +522,7 @@ const MemberRoom = ({
                             Track: {index + 1}
                           </p>
                         </div>
-                        <div className="flex items-center justify-center gap-10">
+                        <div className="flex items-center justify-center gap-5 xl:gap-10">
                           <div
                             className={`hover:bg-white/30 p-2 rounded-full group ${
                               !allowMemberToPlay
