@@ -15,7 +15,8 @@ const Host = () => {
   const [roomCreated, setRoomCreated] = useState(false);
   const [allowMemberToPlay, setallowMemberToPlay] = useState(true);
   const [allowMemberToSync, setallowMemberToSync] = useState(true);
-  const [allowMemberControlVolume, setallowMemberControlVolume] = useState(true);
+  const [allowMemberControlVolume, setallowMemberControlVolume] =
+    useState(true);
 
   useEffect(() => {
     inputRef.current?.focus();
@@ -31,12 +32,17 @@ const Host = () => {
       toast.error("Room ID cannot be empty");
       return;
     }
-    socket.emit("create-room", { roomId , allowMemberToPlay , allowMemberToSync , allowMemberControlVolume });
+    socket.emit("create-room", {
+      roomId,
+      allowMemberToPlay,
+      allowMemberToSync,
+      allowMemberControlVolume,
+    });
     setRoomCreated((prev: boolean) => !prev);
   };
 
   if (roomCreated) {
-    return <HostRoom roomId={roomId}  />;
+    return <HostRoom roomId={roomId} />;
   }
   return (
     <div className="flex flex-col items-center justify-center h-screen text-white relative">
@@ -53,20 +59,20 @@ const Host = () => {
           className="flex flex-col w-fit items-center justify-center gap-2 p-5 bg-black/20 rounded-xl border-1 border-white/20 mx-5 sm:mx-0"
         >
           <div className="flex items-center justify-center gap-2 p-5 ">
-          <input
-            ref={inputRef}
-            type="text"
-            value={roomId}
-            onChange={(e) => setRoomId(e.target.value)}
-            placeholder="Enter Room Name"
-            className="w-full rounded-xl border-1 border-white/20 p-2 max-sm:text-sm  text-center focus:outline-0 "
-          />
-          <button
-            type="submit"
-            className="bg-transparent border-1 hover:bg-blue-600 text-white font-semibold py-2 px-7 rounded-xl hover:cursor-pointer hover:scale-105 transition-all duration-500 flex items-center gap-2 max-sm:text-sm "
-          >
-            Create <BadgePlus className="w-5 h-5 fill-green-600" />
-          </button>
+            <input
+              ref={inputRef}
+              type="text"
+              value={roomId}
+              onChange={(e) => setRoomId(e.target.value.toUpperCase())}
+              placeholder="Enter Room Name"
+              className="w-full rounded-xl border-1 border-white/20 p-2 max-sm:text-sm  text-center focus:outline-0 uppercase placeholder:capitalize"
+            />
+            <button
+              type="submit"
+              className="bg-transparent border-1 hover:bg-blue-600 text-white font-semibold py-2 px-7 rounded-xl hover:cursor-pointer hover:scale-105 transition-all duration-500 flex items-center gap-2 max-sm:text-sm "
+            >
+              Create <BadgePlus className="w-5 h-5 fill-green-600" />
+            </button>
           </div>
           <div className="flex flex-col justify-center gap-2 ">
             <div className="flex gap-3 items-center">
@@ -74,24 +80,27 @@ const Host = () => {
                 type="checkbox"
                 checked={allowMemberToPlay}
                 onChange={() => setallowMemberToPlay((prev) => !prev)}
+                className="appearance-none size-4 border-1 checked:border-none rounded-sm hover:cursor-pointer checked:bg-green-600 checked:ring-4 ring-blue-900 "
               />
-              <p className="text-sm text-center">Allow to play</p>
+              <p className="text-md text-center tracking-wide">Allow to play</p>
             </div>
-            <div className="flex gap-3 items-cente">
+            <div className="flex gap-3 items-center">
               <input
                 type="checkbox"
                 checked={allowMemberToSync}
                 onChange={() => setallowMemberToSync((prev) => !prev)}
+                className="appearance-none size-4 border-1 checked:border-none rounded-sm hover:cursor-pointer checked:bg-green-600 checked:ring-4 ring-blue-900 "
               />
-              <p className="text-sm text-center">Allow to sync</p>
+              <p className="text-md text-center tracking-wide">Allow to sync</p>
             </div>
             <div className="flex gap-3 items-center">
               <input
                 type="checkbox"
                 checked={allowMemberControlVolume}
                 onChange={() => setallowMemberControlVolume((prev) => !prev)}
+                className="appearance-none size-4 border-1 checked:border-none rounded-sm hover:cursor-pointer checked:bg-green-600 checked:ring-4 ring-blue-900 "
               />
-              <p className="text-sm text-center">Allow to control volume</p>
+              <p className="text-md text-center tracking-wide">Allow to control volume</p>
             </div>
           </div>
         </form>

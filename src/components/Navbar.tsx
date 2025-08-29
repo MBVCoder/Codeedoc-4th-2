@@ -1,12 +1,18 @@
 import { ChevronLeft } from "lucide-react";
 import { useNavigate , useLocation} from "react-router-dom";
+import { SocketContext } from "../context/SocketContextProvider";
+import { useContext } from "react";
 
 const Navbar = () => {
   const navigate = useNavigate();
   const location = useLocation(); // Get the current location
+  const { socket } = useContext(SocketContext);
 
   const handleClick = () => {
     navigate(-1);
+    if (socket){
+      socket.disconnect();
+    };
   };
 
   const isHomePage = location.pathname === "/";

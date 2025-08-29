@@ -87,10 +87,10 @@ const Member = () => {
             <input
               ref={inputRef}
               value={roomId}
-              onChange={(e) => setRoomId(e.target.value)}
+              onChange={(e) => setRoomId(e.target.value.toUpperCase())}
               type="text"
               placeholder="Enter Room Name"
-              className="w-full rounded-xl border-1 border-white/20 p-2 max-sm:text-sm  text-center focus:outline-0"
+              className="w-full rounded-xl border-1 border-white/20 p-2 max-sm:text-sm  text-center focus:outline-0 uppercase placeholder:capitalize"
             />
             <button
               type="submit"

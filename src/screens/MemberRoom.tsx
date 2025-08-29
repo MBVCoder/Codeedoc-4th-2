@@ -390,7 +390,7 @@ const MemberRoom = ({
                   <Share2 className="max-w-6 max-h-6" />
                 </div>
               </div>
-              <div className="flex items-center justify-center w-full gap-5 VideoVolume">
+              <div className={`flex items-center justify-center w-full gap-5 VideoVolume ${allowMemberControlVolume ? "block" : "hidden"} `}>
                 {videoVolume === 0 ? <VolumeOff /> : <Volume2 />}
                 {allowMemberControlVolume && (
                   <input
