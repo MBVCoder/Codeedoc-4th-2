@@ -20,6 +20,11 @@ import Heading from "../components/Heading";
 import YouTubePlayer from "youtube-player";
 import { extractYouTubeId } from "../components/ExtractYoutubeId";
 import { Reorder } from "framer-motion";
+import Controller from "../components/common/Controller";
+import ButtonBlack from "../components/common/ButtonBlack";
+import InputVolume from "../components/common/InputVolume";
+import Input from "../components/common/Input";
+import Card from "../components/common/Card";
 
 const MemberRoom = ({
   tracks,
@@ -151,7 +156,6 @@ const MemberRoom = ({
           setIsPlaying(false);
         }
       });
-
   }, [socket, navigate, playerRef.current, tracks]);
 
   useEffect(() => {
@@ -341,15 +345,11 @@ const MemberRoom = ({
                     !allowMemberToPlay ? "opacity-50 pointer-events-none" : ""
                   }`}
                 >
-                  <div
-                    className="hover:bg-white/30 p-2 rounded-full group hover:cursor-pointer"
-                    onClick={() => handleSkip("prev")}
-                  >
+                  <Controller onClick={() => handleSkip("prev")}>
                     <SkipBack className="max-w-6 max-h-6 group-hover:fill-blue-400" />
-                  </div>
+                  </Controller>
 
-                  <div
-                    className="hover:bg-white/30 p-2 rounded-full group hover:cursor-pointer"
+                  <Controller
                     onClick={() => {
                       if (selectedTrack) {
                         handlePlayPause({
@@ -368,18 +368,15 @@ const MemberRoom = ({
                     ) : (
                       <Play className="max-w-6 max-h-6 group-hover:fill-green-400" />
                     )}
-                  </div>
+                  </Controller>
 
-                  <div
-                    className="hover:bg-white/30 p-2 rounded-full group hover:cursor-pointer"
-                    onClick={() => handleSkip("next")}
-                  >
+                  <Controller onClick={() => handleSkip("next")}>
                     <SkipForward className="max-w-6 max-h-6 group-hover:fill-blue-400" />
-                  </div>
+                  </Controller>
                 </div>
 
-                <div
-                  className="p-5 videoShare hover:bg-white/30 rounded-full hover:cursor-pointer "
+                <Controller
+                  className="!p-5 "
                   onClick={() => {
                     if (!selectedTrack)
                       toast.error("Please Play the track first !!");
@@ -390,7 +387,7 @@ const MemberRoom = ({
                   }}
                 >
                   <Share2 className="max-w-6 max-h-6" />
-                </div>
+                </Controller>
               </div>
               <div
                 className={`flex items-center justify-center w-full gap-5 VideoVolume ${
@@ -399,13 +396,12 @@ const MemberRoom = ({
               >
                 {videoVolume === 0 ? <VolumeOff /> : <Volume2 />}
                 {allowMemberControlVolume && (
-                  <input
+                  <InputVolume
                     type="range"
                     min="0"
                     max="100"
-                    value={videoVolume}
+                    value={videoVolume.toString()}
                     onChange={handleVolumeChange}
-                    className="w-full h-full"
                   />
                 )}
               </div>
@@ -413,26 +409,26 @@ const MemberRoom = ({
           </div>
           {allowMemberToSync &&
             (syncActive ? (
-              <button
+              <ButtonBlack
                 onClick={handleSyncOff}
-                className="flex gap-3 py-3 px-5 bg-black/30 rounded-xl hover:bg-black hover:scale-105 duration-500 hover:cursor-pointer mx-auto"
+                className="flex gap-3 !py-3 !px-5 !rounded-xl hover:scale-105 !duration-500 mx-auto"
               >
                 {" "}
                 Pause Sync
                 <RefreshCcw />
-              </button>
+              </ButtonBlack>
             ) : (
-              <button
+              <ButtonBlack
                 onClick={handleSync}
-                className="flex gap-3 py-3 px-5 bg-black/30 rounded-xl hover:bg-black hover:scale-105 duration-500 hover:cursor-pointer mx-auto"
+                className="flex gap-3 !py-3 !px-5 !rounded-xl hover:scale-105 !duration-500 mx-auto"
               >
                 {" "}
                 Sync With Host
                 <RefreshCcw />
-              </button>
+              </ButtonBlack>
             ))}
 
-          <div className="flex flex-col items-center justify-center gap-2 p-5 bg-black/20 rounded-xl border-1 border-white/20 AddtrackContainer">
+          <Card className=" AddtrackContainer">
             <div className="border-b-1 border-white/80 p-3">
               <h1 className="text-2xl font-semibold tracking-wide text-center">
                 Add New Track
@@ -441,34 +437,33 @@ const MemberRoom = ({
             <div className="flex items-center justify-center w-full">
               <form onSubmit={handleSubmit} className="w-full">
                 <div className="flex flex-col items-center justify-center gap-5 py-2 mb-3">
-                  <input
+                  <Input
                     value={videoUrl}
                     onChange={(e) => setVideoUrl(e.target.value)}
                     type="text"
                     placeholder="Enter link ...."
-                    className="w-full h-full border-2 border-white/20 rounded-xl px-6 py-3 focus:outline-0"
+                    className=" h-full !border-2 px-6 py-3 !text-left"
                   />
-                  <input
+                  <Input
                     value={trackName}
                     onChange={(e) => setTrackName(e.target.value)}
                     type="text"
                     placeholder="Enter title ...."
-                    className="w-full h-full
-                  border-2 border-white/20 rounded-xl px-6 py-3 focus:outline-0"
+                    className=" h-full !border-2 px-6 py-3 !text-left"
                   />
                 </div>
-                <div className="flex justify-center items-center">
-                  <button
+                <div className="flex justify-center items-center w-full">
+                  <ButtonBlack
                     type="submit"
-                    className="bg-black/40 hover:bg-black text-white rounded-xl px-6 py-3 w-full h-full hover:cursor-pointer duration-300 flex items-center justify-center gap-2"
+                    className=" text-white !rounded-xl !px-6 !py-3 w-full h-full flex items-center justify-center gap-2"
                   >
                     Add
                     <Plus className="max-w-5 max-h-5" />
-                  </button>
+                  </ButtonBlack>
                 </div>
               </form>
             </div>
-          </div>
+          </Card>
         </div>
         <div className="flex-1 gap-2 p-2 sm:p-5 max-sm:pt-10 bg-black/20 rounded-xl border-1 border-white/20 TracksListContainer max-h-[660px]">
           {tracks.length > 0 ? (
@@ -523,8 +518,8 @@ const MemberRoom = ({
                           </p>
                         </div>
                         <div className="flex items-center justify-center gap-5 xl:gap-10">
-                          <div
-                            className={`hover:bg-white/30 p-2 rounded-full group ${
+                          <Controller
+                            className={`${
                               !allowMemberToPlay
                                 ? "opacity-50 cursor-not-allowed"
                                 : "hover:cursor-pointer"
@@ -539,14 +534,13 @@ const MemberRoom = ({
                             ) : (
                               <Play className="w-5 h-5 group-hover:fill-green-400 group-hover:scale-115" />
                             )}
-                          </div>
+                          </Controller>
 
-                          <div className="hover:bg-white/30 p-2 rounded-full group hover:cursor-pointer">
-                            <Trash
-                              onClick={() => handleDeleteTrack(track.id)}
-                              className="w-5 h-5 group-hover:fill-red-400 group-hover:scale-115 group-hover:cursor-pointer"
-                            />
-                          </div>
+                          <Controller
+                            onClick={() => handleDeleteTrack(track.id)}
+                          >
+                            <Trash className="w-5 h-5 group-hover:fill-red-400 group-hover:scale-115 group-hover:cursor-pointer" />
+                          </Controller>
                         </div>
                       </Reorder.Item>
                     );

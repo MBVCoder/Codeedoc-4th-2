@@ -5,6 +5,9 @@ import { useEffect, useState, useContext, useRef } from "react";
 import { SocketContext } from "../context/SocketContextProvider";
 import { toast } from "react-toastify";
 import MemberRoom from "./MemberRoom";
+import Button from "../components/common/Button";
+import Input from "../components/common/Input";
+import Card from "../components/common/Card";
 
 const Member = () => {
   const [roomId, setRoomId] = useState("");
@@ -80,24 +83,23 @@ const Member = () => {
             </p>
             <hr className="w-1/2 mx-auto mt-2" />
           </div>
-          <form
-            onSubmit={handleSubmit}
-            className="flex max-sm:flex-col w-fit items-center justify-center gap-2 p-5 bg-black/20 rounded-xl border-1 border-white/20 mx-5 sm:mx-0"
-          >
-            <input
-              ref={inputRef}
-              value={roomId}
-              onChange={(e) => setRoomId(e.target.value.toUpperCase())}
-              type="text"
-              placeholder="Enter Room Name"
-              className="w-full rounded-xl border-1 border-white/20 p-2 max-sm:text-sm  text-center focus:outline-0 uppercase placeholder:capitalize"
-            />
-            <button
-              type="submit"
-              className="bg-transparent border-1 hover:bg-green-600 text-white font-semibold py-2 px-7 rounded-xl hover:cursor-pointer hover:scale-105 transition-all duration-500 flex items-center gap-2 max-sm:text-sm "
-            >
-              Join <Plus className="w-5 h-5 fill-green-600" />
-            </button>
+          <form onSubmit={handleSubmit}>
+            <Card className="max-sm:flex-col !flex-row w-fit mx-5 sm:mx-0">
+              <Input
+                ref={inputRef}
+                value={roomId}
+                onChange={(e) => setRoomId(e.target.value.toUpperCase())}
+                type="text"
+                placeholder="Enter Room Name"
+                className="w-full rounded-xl border-1 border-white/20 p-2 max-sm:text-sm  text-center focus:outline-0 uppercase placeholder:capitalize"
+              />
+              <Button
+                type="submit"
+                className=" hover:bg-green-600  max-sm:text-sm "
+              >
+                Join <Plus className="w-5 h-5 fill-green-600" />
+              </Button>
+            </Card>
           </form>
           <p className="text-center">
             Not have any room ?{" "}
