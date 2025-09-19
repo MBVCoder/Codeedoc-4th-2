@@ -21,10 +21,11 @@ import YouTubePlayer from "youtube-player";
 import { extractYouTubeId } from "../components/ExtractYoutubeId";
 import { Reorder } from "framer-motion";
 import Controller from "../components/common/Controller";
-import ButtonBlack from "../components/common/ButtonBlack";
+import Button from "../components/common/Button";
 import InputVolume from "../components/common/InputVolume";
 import Input from "../components/common/Input";
 import Card from "../components/common/Card";
+import TrackItem from "../components/TrackItem";
 
 const MemberRoom = ({
   tracks,
@@ -409,23 +410,25 @@ const MemberRoom = ({
           </div>
           {allowMemberToSync &&
             (syncActive ? (
-              <ButtonBlack
+              <Button
+                variant="black"
                 onClick={handleSyncOff}
                 className="flex gap-3 !py-3 !px-5 !rounded-xl hover:scale-105 !duration-500 mx-auto"
               >
                 {" "}
                 Pause Sync
                 <RefreshCcw />
-              </ButtonBlack>
+              </Button>
             ) : (
-              <ButtonBlack
+              <Button
+                variant="black"
                 onClick={handleSync}
                 className="flex gap-3 !py-3 !px-5 !rounded-xl hover:scale-105 !duration-500 mx-auto"
               >
                 {" "}
                 Sync With Host
                 <RefreshCcw />
-              </ButtonBlack>
+              </Button>
             ))}
 
           <Card className=" AddtrackContainer">
@@ -453,13 +456,14 @@ const MemberRoom = ({
                   />
                 </div>
                 <div className="flex justify-center items-center w-full">
-                  <ButtonBlack
+                  <Button
+                    variant="black"
                     type="submit"
                     className=" text-white !rounded-xl !px-6 !py-3 w-full h-full flex items-center justify-center gap-2"
                   >
                     Add
                     <Plus className="max-w-5 max-h-5" />
-                  </ButtonBlack>
+                  </Button>
                 </div>
               </form>
             </div>
@@ -493,56 +497,68 @@ const MemberRoom = ({
                     const isThisTrack = currentPlayingId === track.id;
 
                     return (
-                      <Reorder.Item
+                      <TrackItem
                         key={track.id}
-                        value={track}
-                        whileDrag={{ scale: 1.05 }}
-                        whileHover={{ scale: 1.02 }}
-                        transition={{
-                          type: "spring",
-                          stiffness: 300,
-                          damping: 25,
-                        }}
-                        className={`flex items-center justify-between gap-2 p-2 rounded-xl border-1 ${
-                          isThisTrack && isPlaying
-                            ? "border-white bg-white/20"
-                            : "border-white/20 bg-black/20"
-                        } w-full h-20 px-10`}
-                      >
-                        <div className="flex flex-col">
-                          <h1 className="text-xl font-semibold tracking-wide my-1 text-left line-clamp-1 overflow-hidden break-all">
-                            {track.title}
-                          </h1>
-                          <p className="text-sm text-white/30 line-clamp-1 overflow-hidden break-all">
-                            Track: {index + 1}
-                          </p>
-                        </div>
-                        <div className="flex items-center justify-center gap-5 xl:gap-10">
-                          <Controller
-                            className={`${
-                              !allowMemberToPlay
-                                ? "opacity-50 cursor-not-allowed"
-                                : "hover:cursor-pointer"
-                            }`}
-                            onClick={() =>
-                              allowMemberToPlay &&
-                              handlePlayPause({ id: track.id, index })
-                            }
-                          >
-                            {isThisTrack && isPlaying ? (
-                              <Pause className="w-5 h-5 group-hover:fill-red-400 group-hover:scale-115" />
-                            ) : (
-                              <Play className="w-5 h-5 group-hover:fill-green-400 group-hover:scale-115" />
-                            )}
-                          </Controller>
+                        track={track}
+                        index={index}
+                        currentPlayingId={currentPlayingId}
+                        isPlaying={isPlaying}
+                        onPlayPause={(id, idx) =>
+                          handlePlayPause({ id, index: idx })
+                        }
+                        onDelete={handleDeleteTrack}
+                        allowPlay={allowMemberToPlay}
+                      />
+                      // <Reorder.Item
+                      //   key={track.id}
+                      //   value={track}
+                      //   whileDrag={{ scale: 1.05 }}
+                      //   whileHover={{ scale: 1.02 }}
+                      //   transition={{
+                      //     type: "spring",
+                      //     stiffness: 300,
+                      //     damping: 25,
+                      //   }}
+                      //   className={`flex items-center justify-between gap-2 p-2 rounded-xl border-1 ${
+                      //     isThisTrack && isPlaying
+                      //       ? "border-white bg-white/20"
+                      //       : "border-white/20 bg-black/20"
+                      //   } w-full h-20 px-10`}
+                      // >
+                      //   <div className="flex flex-col">
+                      //     <h1 className="text-xl font-semibold tracking-wide my-1 text-left line-clamp-1 overflow-hidden break-all">
+                      //       {track.title}
+                      //     </h1>
+                      //     <p className="text-sm text-white/30 line-clamp-1 overflow-hidden break-all">
+                      //       Track: {index + 1}
+                      //     </p>
+                      //   </div>
+                      //   <div className="flex items-center justify-center gap-5 xl:gap-10">
+                      //     <Controller
+                      //       className={`${
+                      //         !allowMemberToPlay
+                      //           ? "opacity-50 cursor-not-allowed"
+                      //           : "hover:cursor-pointer"
+                      //       }`}
+                      //       onClick={() =>
+                      //         allowMemberToPlay &&
+                      //         handlePlayPause({ id: track.id, index })
+                      //       }
+                      //     >
+                      //       {isThisTrack && isPlaying ? (
+                      //         <Pause className="w-5 h-5 group-hover:fill-red-400 group-hover:scale-115" />
+                      //       ) : (
+                      //         <Play className="w-5 h-5 group-hover:fill-green-400 group-hover:scale-115" />
+                      //       )}
+                      //     </Controller>
 
-                          <Controller
-                            onClick={() => handleDeleteTrack(track.id)}
-                          >
-                            <Trash className="w-5 h-5 group-hover:fill-red-400 group-hover:scale-115 group-hover:cursor-pointer" />
-                          </Controller>
-                        </div>
-                      </Reorder.Item>
+                      //     <Controller
+                      //       onClick={() => handleDeleteTrack(track.id)}
+                      //     >
+                      //       <Trash className="w-5 h-5 group-hover:fill-red-400 group-hover:scale-115 group-hover:cursor-pointer" />
+                      //     </Controller>
+                      //   </div>
+                      // </Reorder.Item>
                     );
                   })}
                 </Reorder.Group>
